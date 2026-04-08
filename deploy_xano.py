@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-XanoScript Deployment Tool
-Deploy Subject Database changes from Stage to Xano Production
+Xano Deployment Tool - Corrigido
+Usa a Xano Meta API corretamente para criar tabelas, endpoints e funções.
 
-Usage:
-    python deploy_xano.py --environment production
+Uso:
+    python deploy_xano.py
     python deploy_xano.py --dry-run
 """
 
@@ -13,367 +13,312 @@ import sys
 import json
 import argparse
 import requests
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional, List
 from dataclasses import dataclass
 
-# Configuration
-XANO_API_BASE = os.getenv("XANO_API_BASE", "https://api.xano.io/v1")
-XANO_WORKSPACE_ID = os.getenv("XANO_WORKSPACE_ID", "edutrack-ai")
-XANO_API_KEY = os.getenv("XANO_API_KEY", "")
+# ─────────────────────────────────────────────
+# CONFIGURAÇÃO — edite aqui ou use variáveis de ambiente
+# ─────────────────────────────────────────────
 
-# Files to deploy
-DEPLOY_MANIFEST = {
-    "tables": [
-        {
-            "id": "753426",
-            "name": "subject",
-            "type": "table",
-            "path": "atv2Lab/tables/753426_subject.xs",
-            "description": "Subject (Discipline) table with 14 fields"
-        },
-        {
-            "id": "754426",
-            "name": "subject_triggers",
-            "type": "triggers",
-            "path": "atv2Lab/tables/triggers/754426_subject_triggers.xs",
-            "description": "Subject triggers for auditoria (6 triggers)"
-        }
-    ],
-    "endpoints": [
-        {
-            "id": "3600550",
-            "path": "GET /subjects/my",
-            "type": "endpoint",
-            "file": "atv2Lab/apis/subjects/3600550_subjects_my_GET.xs",
-            "description": "List user's subjects with pagination"
-        },
-        {
-            "id": "3600551",
-            "path": "GET /subjects/{id}",
-            "type": "endpoint",
-            "file": "atv2Lab/apis/subjects/3600551_subjects_id_GET.xs",
-            "description": "Get single subject by ID with RBAC"
-        },
-        {
-            "id": "3600552",
-            "path": "POST /subjects",
-            "type": "endpoint",
-            "file": "atv2Lab/apis/subjects/3600552_subjects_POST.xs",
-            "description": "Create new subject with validation"
-        },
-        {
-            "id": "3600553",
-            "path": "PATCH /subjects/{id}",
-            "type": "endpoint",
-            "file": "atv2Lab/apis/subjects/3600553_subjects_id_PATCH.xs",
-            "description": "Update subject with partial data"
-        },
-        {
-            "id": "3600554",
-            "path": "DELETE /subjects/{id}",
-            "type": "endpoint",
-            "file": "atv2Lab/apis/subjects/3600554_subjects_id_DELETE.xs",
-            "description": "Delete subject (soft delete via trigger)"
-        },
-        {
-            "id": "subjects_api_group",
-            "path": "API Group: Subjects",
-            "type": "api_group",
-            "file": "atv2Lab/apis/subjects/api_group.xs",
-            "description": "API group for subjects resources"
-        }
-    ],
-    "functions": [
-        {
-            "id": "269538",
-            "name": "check_subject_access",
-            "type": "function",
-            "file": "atv2Lab/functions/getting_started_template/269538_check_subject_access.xs",
-            "description": "RBAC access control for subjects"
-        }
-    ]
-}
+# Instância do seu Xano (domínio base, sem /api:...)
+XANO_INSTANCE = os.getenv("XANO_INSTANCE", "x8ki-letl-twmt.n7.xano.io")
 
+# Chave de API (Meta Token) — gere em: Settings → API Keys no Xano
+XANO_API_KEY = os.getenv("XANO_API_KEY", "eyJhbGciOiJSUzI1NiJ9.eyJ4YW5vIjp7ImRibyI6Im1hc3Rlcjp1c2VyIiwiaWQiOjE1NjMwMiwibmFtZSI6ImFsaWN5YSBhemF0byIsImVtYWlsIjoiYWxpY3lhLmF6YXRvQGFsdW5vLmltcGFjdGEuZWR1LmJyIiwiYWNjZXNzX3Rva2VuIjp7ImtleWlkIjoiZjRlZTYwYjctZWQ0OS00ZTM2LWEzMTQtM2MyNWQzMWJmOWYyIiwic2NvcGUiOnsidGVuYW50X2NlbnRlcjpiYWNrdXAiOjE1LCJ0ZW5hbnRfY2VudGVyOmRlcGxveSI6MTYsInRlbmFudF9jZW50ZXI6aW1wZXJzb25hdGUiOjE2LCJ0ZW5hbnRfY2VudGVyOm1ldGFkYXRhOmFwaSI6MCwidGVuYW50X2NlbnRlcjpsb2ciOjE2LCJ0ZW5hbnRfY2VudGVyOnJiYWMiOjE2LCJ0ZW5hbnRfY2VudGVyOnNlY3JldHMiOjE1LCJ0ZW5hbnRfY2x1c3RlciI6MTUsInRlbmFudF9jbHVzdGVyOnNlY3JldHMiOjE1LCJ0ZW5hbnRfY2VudGVyIjoxNSwicmVsZWFzZSI6MTUsIndvcmtzcGFjZTphZGRvbiI6MTUsIndvcmtzcGFjZTphcGkiOjE1LCJ3b3Jrc3BhY2U6Y29udGVudCI6MTUsIndvcmtzcGFjZTpkYXRhYmFzZSI6MTUsIndvcmtzcGFjZTpkYXRhc291cmNlOmxpdmUiOjE1LCJ3b3Jrc3BhY2U6ZmlsZSI6MTUsIndvcmtzcGFjZTpmdW5jdGlvbiI6MTUsIndvcmtzcGFjZTpzZXJ2aWNlIjoxNSwid29ya3NwYWNlOmxvZyI6MTUsIndvcmtzcGFjZTptaWRkbGV3YXJlIjoxNSwid29ya3NwYWNlOnJlcXVlc3RoaXN0b3J5IjoxNSwid29ya3NwYWNlOnRhc2siOjE1LCJ3b3Jrc3BhY2U6dG9vbCI6MTUsIndvcmtzcGFjZTpyZWFsdGltZSI6MTUsIndvcmtzcGFjZTp3b3JrZmxvd190ZXN0IjoxNX19fSwiaWF0IjoxNzc1NjExMDcyLCJuYmYiOjE3NzU2MTEwNzIsImF1ZCI6Inhhbm86bWV0YSJ9.vhL6TFv4u1bV_AMd741Rlp8AGB3LaB71UvpMU4FoWORJkfr5GmSGmJplzeXUA68SDn0NaC5ijEYqsGhCxkHCLbH99__gICcyOskxx77zYiOLC-uvPzekUmx-phIsO7nAxApan8zHq8TFlesrbBma3eNRBeiToAO7P2rrVlBUbgAr1PALShVMdwoSt23ygJtstYNc2PLy0sF0a0pmgQBf-GN7JLIFvoyNcGZ-v6o3CbumTq3AAxim9E_RAzPHPqHaZoIremETBrA3BZrsbGG3iQgtPO3ABGwIaGAC36VknyaTz1COerXL8Mv6MOw-VEqw219cTj4iukIq3S5XCJu5-ZqqG7mQZzocOu8Y3aUTSO3fUjghFAFC3lQl2_BXgiyMVVYtULnkkVSOQgxAIm6Ty_i-UvyK1aL56HuXW7rfVLMcp9G2-RtwwePWQvZxw0f-aSHBU_By1_VwY5mNB88T6AZnQOT2hMM-p4jVBUGDzie5S-FFYDnOo84eH1l74bgXCfogRFMAwT6Wh0sgTugEhRf55eoqwYInzIqevDKTRYlGuut8GOwX93zfgyTyE8tguYoUfwXFgFaG-ZR2JgUy8tdH63gBmqe9qAjsR7hU2-W7MrL1zXV-UjMl2ObDDC6iR4kjJpelAEKpzwtPxGdBQPmGPOtg4EHz8_5aPKXz2K0")  # ← coloque sua chave aqui ou no .env
 
+# ID do workspace (número antes do traço, ex: "148838" de "148838-0")
+XANO_WORKSPACE_ID = os.getenv("XANO_WORKSPACE_ID", "148838")
+
+# ID do API Group onde os endpoints serão criados (398699 = o que você criou)
+XANO_API_GROUP_ID = os.getenv("XANO_API_GROUP_ID", "398699")
+
+# Base da Meta API do Xano
+META_BASE = f"https://{XANO_INSTANCE}/api:meta"
+
+# ─────────────────────────────────────────────
+# DEFINIÇÃO DOS RECURSOS A CRIAR
+# ─────────────────────────────────────────────
+ 
+TABLES_TO_CREATE = [
+    {
+        "name": "subject",
+        "description": "Tabela de disciplinas",
+        "fields": [
+            {"name": "name",        "type": "text"},
+            {"name": "code",        "type": "text"},
+            {"name": "description", "type": "text"},
+            {"name": "owner_id",    "type": "int"},
+            {"name": "account_id",  "type": "int"},
+            {"name": "credits",     "type": "decimal"},
+            {"name": "semester",    "type": "text"},
+            {"name": "year",        "type": "int"},
+            {"name": "status",      "type": "text"},
+            {"name": "is_active",   "type": "bool"},
+        ]
+    },
+]
+ 
+ENDPOINTS_TO_CREATE = [
+    {
+        "name":        "Get My Subjects",
+        "verb":        "GET",
+        "path":        "/subjects/my",
+        "description": "List user's subjects with pagination",
+        "input": [
+            {"name": "page",  "type": "int",  "required": False},
+            {"name": "limit", "type": "int",  "required": False},
+        ],
+    },
+    {
+        "name":        "Get Subject by ID",
+        "verb":        "GET",
+        "path":        "/subjects/{id}",
+        "description": "Get single subject by ID with RBAC",
+        "input": [
+            {"name": "id", "type": "int", "required": True},
+        ],
+    },
+    {
+        "name":        "Create Subject",
+        "verb":        "POST",
+        "path":        "/subjects",
+        "description": "Create new subject with validation",
+        "input": [
+            {"name": "name",        "type": "text",    "required": True},
+            {"name": "code",        "type": "text",    "required": True},
+            {"name": "description", "type": "text",    "required": False},
+            {"name": "credits",     "type": "decimal", "required": False},
+            {"name": "semester",    "type": "text",    "required": False},
+            {"name": "year",        "type": "int",     "required": False},
+        ],
+    },
+    {
+        "name":        "Update Subject",
+        "verb":        "PATCH",
+        "path":        "/subjects/{id}",
+        "description": "Update subject with partial data",
+        "input": [
+            {"name": "id",          "type": "int",  "required": True},
+            {"name": "name",        "type": "text", "required": False},
+            {"name": "description", "type": "text", "required": False},
+            {"name": "status",      "type": "text", "required": False},
+        ],
+    },
+    {
+        "name":        "Delete Subject",
+        "verb":        "DELETE",
+        "path":        "/subjects/{id}",
+        "description": "Soft delete subject via trigger",
+        "input": [
+            {"name": "id", "type": "int", "required": True},
+        ],
+    },
+]
+ 
+ 
+# ─────────────────────────────────────────────
+# DATACLASS DE STATUS
+# ─────────────────────────────────────────────
+ 
 @dataclass
 class DeployStatus:
     success: bool
-    item_id: str
-    item_name: str
-    item_type: str
+    name: str
+    kind: str
     message: str
     error: Optional[str] = None
-
-
+ 
+ 
+# ─────────────────────────────────────────────
+# DEPLOYER
+# ─────────────────────────────────────────────
+ 
 class XanoDeployer:
-    def __init__(self, api_key: str, workspace_id: str = XANO_WORKSPACE_ID):
-        self.api_key = api_key
-        self.workspace_id = workspace_id
+    def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
+            "Authorization": f"Bearer {XANO_API_KEY}",
+            "Content-Type": "application/json",
+            "X-Branch": "main",          # branch padrão do Xano
         })
         self.results: List[DeployStatus] = []
-
-    def deploy_table(self, table_id: str, table_name: str, dry_run: bool = False) -> DeployStatus:
-        """Deploy a database table to production"""
-        print(f"  📦 Deploying table: {table_name} (ID: {table_id})")
-        
+ 
+    # ── helpers ──────────────────────────────
+ 
+    def _post(self, url: str, payload: dict):
+        resp = self.session.post(url, json=payload)
+        return resp
+ 
+    def _get(self, url: str):
+        return self.session.get(url)
+ 
+    # ── verificar conexão ─────────────────────
+ 
+    def verify(self) -> bool:
+        """Verifica se a API Key e o workspace existem."""
+        url = f"{META_BASE}/workspace/{XANO_WORKSPACE_ID}"
+        resp = self._get(url)
+        if resp.status_code == 200:
+            data = resp.json()
+            print(f"✅ Workspace encontrado: {data.get('name', XANO_WORKSPACE_ID)}")
+            return True
+        else:
+            print(f"❌ Falha ao acessar workspace {XANO_WORKSPACE_ID}")
+            print(f"   Status: {resp.status_code}")
+            print(f"   Resposta: {resp.text}")
+            return False
+ 
+    # ── tabelas ───────────────────────────────
+ 
+    def create_table(self, table: dict, dry_run: bool) -> DeployStatus:
+        name = table["name"]
+        print(f"  📦 Tabela: {name}")
+ 
         if dry_run:
-            return DeployStatus(
-                success=True,
-                item_id=table_id,
-                item_name=table_name,
-                item_type="table",
-                message="[DRY RUN] Would deploy table"
-            )
-
-        try:
-            endpoint = f"{XANO_API_BASE}/tables/{table_id}/deploy"
-            payload = {
-                "workspace_id": self.workspace_id,
-                "environment": "production",
-                "action": "deploy"
+            return DeployStatus(True, name, "table", "[DRY RUN] Criaria a tabela")
+ 
+        # 1. Criar a tabela
+        url = f"{META_BASE}/workspace/{XANO_WORKSPACE_ID}/table"
+        payload = {
+            "name": name,
+            "description": table.get("description", ""),
+            "docs": "",
+            "tag": [],
+        }
+        resp = self._post(url, payload)
+ 
+        if resp.status_code not in (200, 201):
+            err = resp.json() if resp.text else {}
+            if "already being used" in err.get("message", ""):
+                print(f"     ⚠️  Tabela '{name}' já existe — pulando")
+                return DeployStatus(True, name, "table", "⚠️  Já existia, pulado")
+            return DeployStatus(False, name, "table", "❌ Falha ao criar tabela", resp.text)
+ 
+        table_id = resp.json().get("id")
+        print(f"     ✅ Tabela criada (ID: {table_id})")
+ 
+        # 2. Adicionar campos
+        for field in table.get("fields", []):
+            field_url = f"{META_BASE}/workspace/{XANO_WORKSPACE_ID}/table/{table_id}/field"
+            field_payload = {
+                "name": field["name"],
+                "type": field["type"],
+                "nullable": True,
+                "default": None,
             }
-            
-            response = self.session.post(endpoint, json=payload)
-            
-            if response.status_code in [200, 201]:
-                return DeployStatus(
-                    success=True,
-                    item_id=table_id,
-                    item_name=table_name,
-                    item_type="table",
-                    message=f"✅ Successfully deployed"
-                )
+            fr = self._post(field_url, field_payload)
+            if fr.status_code in (200, 201):
+                print(f"     ✅ Campo '{field['name']}' adicionado")
             else:
-                return DeployStatus(
-                    success=False,
-                    item_id=table_id,
-                    item_name=table_name,
-                    item_type="table",
-                    message=f"❌ Failed to deploy",
-                    error=response.text
-                )
-        except Exception as e:
-            return DeployStatus(
-                success=False,
-                item_id=table_id,
-                item_name=table_name,
-                item_type="table",
-                message=f"❌ Exception during deploy",
-                error=str(e)
-            )
-
-    def deploy_endpoint(self, endpoint_id: str, endpoint_path: str, dry_run: bool = False) -> DeployStatus:
-        """Deploy an API endpoint to production"""
-        print(f"  🔌 Deploying endpoint: {endpoint_path} (ID: {endpoint_id})")
-        
+                print(f"     ⚠️  Campo '{field['name']}' falhou: {fr.text}")
+ 
+        return DeployStatus(True, name, "table", "✅ Tabela criada com sucesso")
+ 
+    # ── endpoints ─────────────────────────────
+ 
+    def create_endpoint(self, ep: dict, dry_run: bool) -> DeployStatus:
+        label = f"{ep['verb']} {ep['path']}"
+        print(f"  🔌 Endpoint: {label}")
+ 
         if dry_run:
-            return DeployStatus(
-                success=True,
-                item_id=endpoint_id,
-                item_name=endpoint_path,
-                item_type="endpoint",
-                message="[DRY RUN] Would deploy endpoint"
-            )
-
-        try:
-            endpoint = f"{XANO_API_BASE}/endpoints/{endpoint_id}/deploy"
-            payload = {
-                "workspace_id": self.workspace_id,
-                "environment": "production",
-                "action": "deploy"
-            }
-            
-            response = self.session.post(endpoint, json=payload)
-            
-            if response.status_code in [200, 201]:
-                return DeployStatus(
-                    success=True,
-                    item_id=endpoint_id,
-                    item_name=endpoint_path,
-                    item_type="endpoint",
-                    message=f"✅ Successfully deployed"
-                )
-            else:
-                return DeployStatus(
-                    success=False,
-                    item_id=endpoint_id,
-                    item_name=endpoint_path,
-                    item_type="endpoint",
-                    message=f"❌ Failed to deploy",
-                    error=response.text
-                )
-        except Exception as e:
-            return DeployStatus(
-                success=False,
-                item_id=endpoint_id,
-                item_name=endpoint_path,
-                item_type="endpoint",
-                message=f"❌ Exception during deploy",
-                error=str(e)
-            )
-
-    def deploy_function(self, function_id: str, function_name: str, dry_run: bool = False) -> DeployStatus:
-        """Deploy a backend function to production"""
-        print(f"  ⚙️ Deploying function: {function_name} (ID: {function_id})")
-        
-        if dry_run:
-            return DeployStatus(
-                success=True,
-                item_id=function_id,
-                item_name=function_name,
-                item_type="function",
-                message="[DRY RUN] Would deploy function"
-            )
-
-        try:
-            endpoint = f"{XANO_API_BASE}/functions/{function_id}/deploy"
-            payload = {
-                "workspace_id": self.workspace_id,
-                "environment": "production",
-                "action": "deploy"
-            }
-            
-            response = self.session.post(endpoint, json=payload)
-            
-            if response.status_code in [200, 201]:
-                return DeployStatus(
-                    success=True,
-                    item_id=function_id,
-                    item_name=function_name,
-                    item_type="function",
-                    message=f"✅ Successfully deployed"
-                )
-            else:
-                return DeployStatus(
-                    success=False,
-                    item_id=function_id,
-                    item_name=function_name,
-                    item_type="function",
-                    message=f"❌ Failed to deploy",
-                    error=response.text
-                )
-        except Exception as e:
-            return DeployStatus(
-                success=False,
-                item_id=function_id,
-                item_name=function_name,
-                item_type="function",
-                message=f"❌ Exception during deploy",
-                error=str(e)
-            )
-
+            return DeployStatus(True, label, "endpoint", "[DRY RUN] Criaria o endpoint")
+ 
+        url = f"{META_BASE}/workspace/{XANO_WORKSPACE_ID}/apigroup/{XANO_API_GROUP_ID}/api"
+        payload = {
+            "name":        ep["name"],
+            "verb":        ep["verb"],
+            "path":        ep["path"],
+            "description": ep.get("description", ""),
+            "input":       ep.get("input", []),
+            "tag":         [],
+            "docs":        "",
+        }
+        resp = self._post(url, payload)
+ 
+        if resp.status_code in (200, 201):
+            ep_id = resp.json().get("id", "?")
+            print(f"     ✅ Endpoint criado (ID: {ep_id})")
+            return DeployStatus(True, label, "endpoint", f"✅ Criado (ID: {ep_id})")
+        else:
+            return DeployStatus(False, label, "endpoint", "❌ Falha ao criar endpoint", resp.text)
+ 
+    # ── deploy completo ───────────────────────
+ 
     def deploy_all(self, dry_run: bool = False):
-        """Deploy all resources"""
         print("\n" + "="*60)
-        print("🚀 XanoScript Subject Database Deployment")
-        print("="*60 + "\n")
-
-        if dry_run:
-            print("⚠️  DRY RUN MODE - No actual changes will be made\n")
-
-        # Deploy tables
-        print("📊 1. Deploying Database Tables...")
-        for table in DEPLOY_MANIFEST["tables"]:
-            status = self.deploy_table(table["id"], table["name"], dry_run)
-            self.results.append(status)
-            print(f"     {status.message}")
-
-        # Deploy endpoints
-        print("\n🔌 2. Deploying REST API Endpoints...")
-        for endpoint in DEPLOY_MANIFEST["endpoints"]:
-            status = self.deploy_endpoint(endpoint["id"], endpoint["path"], dry_run)
-            self.results.append(status)
-            print(f"     {status.message}")
-
-        # Deploy functions
-        print("\n⚙️  3. Deploying Backend Functions...")
-        for function in DEPLOY_MANIFEST["functions"]:
-            status = self.deploy_function(function["id"], function["name"], dry_run)
-            self.results.append(status)
-            print(f"     {status.message}")
-
-        # Summary
-        self.print_summary()
-
-    def print_summary(self):
-        """Print deployment summary"""
-        total = len(self.results)
-        successful = sum(1 for r in self.results if r.success)
-        failed = total - successful
-
-        print("\n" + "="*60)
-        print("📋 DEPLOYMENT SUMMARY")
+        print("🚀 Xano Deployment — Subjects")
         print("="*60)
-        print(f"Total Items:    {total}")
-        print(f"Successful:     {successful} ✅")
-        print(f"Failed:         {failed} ❌")
-        print("="*60 + "\n")
-
-        if failed > 0:
-            print("Failed items:")
-            for result in self.results:
-                if not result.success:
-                    print(f"  ❌ {result.item_type}: {result.item_name}")
-                    if result.error:
-                        print(f"     Error: {result.error}")
-
-        return successful == total
-
-
-def verify_environment():
-    """Verify deployment environment"""
-    if not XANO_API_KEY:
-        print("❌ ERROR: XANO_API_KEY not set in environment")
-        print("   Please set: export XANO_API_KEY='your_api_key_here'")
-        return False
-
-    print(f"✅ Environment verified:")
-    print(f"   API Base: {XANO_API_BASE}")
-    print(f"   Workspace: {XANO_WORKSPACE_ID}")
-    print(f"   API Key: {'*' * (len(XANO_API_KEY)-4) + XANO_API_KEY[-4:]}")
-    return True
-
-
+        if dry_run:
+            print("⚠️  DRY RUN — nenhuma alteração será feita\n")
+ 
+        # Tabelas
+        print("\n📊 1. Criando tabelas...")
+        for table in TABLES_TO_CREATE:
+            status = self.create_table(table, dry_run)
+            self.results.append(status)
+ 
+        # Endpoints
+        print("\n🔌 2. Criando endpoints no API Group", XANO_API_GROUP_ID, "...")
+        for ep in ENDPOINTS_TO_CREATE:
+            status = self.create_endpoint(ep, dry_run)
+            self.results.append(status)
+ 
+        self._print_summary()
+ 
+    def _print_summary(self):
+        total = len(self.results)
+        ok = sum(1 for r in self.results if r.success)
+        fail = total - ok
+ 
+        print("\n" + "="*60)
+        print("📋 RESUMO DO DEPLOY")
+        print("="*60)
+        print(f"Total:      {total}")
+        print(f"Sucesso:    {ok} ✅")
+        print(f"Falhas:     {fail} ❌")
+        print("="*60)
+ 
+        if fail:
+            print("\nItens com falha:")
+            for r in self.results:
+                if not r.success:
+                    print(f"  ❌ [{r.kind}] {r.name}")
+                    if r.error:
+                        print(f"     Erro: {r.error}")
+ 
+ 
+# ─────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────
+ 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Deploy Subject Database to Xano Production"
-    )
-    parser.add_argument(
-        "--environment",
-        default="production",
-        choices=["stage", "production"],
-        help="Target environment (default: production)"
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be deployed without making changes"
-    )
-    parser.add_argument(
-        "--skip-verify",
-        action="store_true",
-        help="Skip environment verification"
-    )
-
+    parser = argparse.ArgumentParser(description="Deploy Subjects no Xano")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Mostra o que seria feito sem executar")
     args = parser.parse_args()
-
-    # Verify environment
-    if not args.skip_verify:
-        if not verify_environment():
-            sys.exit(1)
-
-    # Deploy
-    deployer = XanoDeployer(XANO_API_KEY)
+ 
+    if not XANO_API_KEY:
+        print("❌ XANO_API_KEY não configurada.")
+        print("   Defina no arquivo ou via: export XANO_API_KEY='sua_chave'")
+        sys.exit(1)
+ 
+    deployer = XanoDeployer()
+ 
+    print(f"🔧 Configuração:")
+    print(f"   Instância:   {XANO_INSTANCE}")
+    print(f"   Workspace:   {XANO_WORKSPACE_ID}")
+    print(f"   API Group:   {XANO_API_GROUP_ID}")
+    print(f"   API Key:     {'*' * (len(XANO_API_KEY)-4) + XANO_API_KEY[-4:]}\n")
+ 
+    if not deployer.verify():
+        print("\n💡 Dica: verifique se a XANO_API_KEY é um Meta Token (não um Auth Token de usuário).")
+        print("   Gere em: Xano → Settings → API Keys")
+        sys.exit(1)
+ 
     deployer.deploy_all(dry_run=args.dry_run)
-
-    # Exit with appropriate code
-    sys.exit(0 if deployer.results[-1] if deployer.results else True else 1)
-
-
+    ok = all(r.success for r in deployer.results)
+    sys.exit(0 if ok else 1)
+ 
+ 
 if __name__ == "__main__":
     main()
