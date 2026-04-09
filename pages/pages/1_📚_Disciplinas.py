@@ -22,4 +22,4 @@ with tab_lista:
     st.dataframe([
         {"Nome": "Python Basics", "Professor": "Oriel", "Dia": "Seg"},
         {"Nome": "No-Code Advanced", "Professor": "Giuliano", "Dia": "Qui"},
-], width='stretch')
+    ], width='stretch')
