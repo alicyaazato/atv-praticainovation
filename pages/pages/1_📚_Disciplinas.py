@@ -2,9 +2,12 @@
 import streamlit as st
 
 st.set_page_config(page_title="Disciplinas", page_icon="📚")
+
 st.title("Gestão de Disciplinas")
+
 # Abas para separar Listagem de Cadastro
 tab_lista, tab_novo = st.tabs(["📋 Listar", "➕ Nova Disciplina"])
+
 with tab_novo:
     st.subheader("Cadastrar Nova Matéria")
     with st.form("form_disciplina"):
@@ -13,9 +16,9 @@ with tab_novo:
         dia_semana = st.selectbox("Dia da Aula", ["Seg", "Ter", "Qua", "Qui",
 "Sex"])
         
-    submitted = st.form_submit_button("Salvar")
-    if submitted:
-        st.success(f"Diciplina {nome} cadastrada! (Simulação)")
+        submitted = st.form_submit_button("Salvar")
+        if submitted:
+            st.success(f"Diciplina {nome} cadastrada! (Simulação)")
 with tab_lista:
     st.info("A conexão com o Xano virá na Tarefa 13.")
     # Mockup de uma tabela
