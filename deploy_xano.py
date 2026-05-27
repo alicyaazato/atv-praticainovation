@@ -38,6 +38,20 @@ DEPLOY_MANIFEST = {
             "type": "triggers",
             "path": "atv2Lab/tables/triggers/754426_subject_triggers.xs",
             "description": "Subject triggers for auditoria (6 triggers)"
+        },
+        {
+            "id": "753428",
+            "name": "academic_task",
+            "type": "table",
+            "path": "atv2Lab/tables/753428_academic_task.xs",
+            "description": "Academic tasks (lessons, tests, assignments) linked to subjects"
+        },
+        {
+            "id": "754428",
+            "name": "academic_task_triggers",
+            "type": "triggers",
+            "path": "atv2Lab/tables/triggers/754428_academic_task_triggers.xs",
+            "description": "Academic task triggers for event logging (6 triggers)"
         }
     ],
     "endpoints": [
@@ -372,7 +386,8 @@ def main():
     deployer.deploy_all(dry_run=args.dry_run)
 
     # Exit with appropriate code
-    sys.exit(0 if deployer.results[-1] if deployer.results else True else 1)
+    success = deployer.results[-1] if deployer.results else True
+    sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":

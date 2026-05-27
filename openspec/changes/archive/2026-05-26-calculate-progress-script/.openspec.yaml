@@ -1,0 +1,18 @@
+schema: spec-driven
+created: 2026-05-26
+title: Calculate Progress Script
+description: Python script to calculate student progress percentage (completed/total tasks) and return JSON
+
+artifacts:
+  proposal: proposal.md
+  design: design.md
+  specification: SPECIFICATION.md
+  tasks: tasks.md
+
+status: planned
+priority: high
+
+related_entities:
+  - academic_task (database table)
+  - subject (database table)
+  - user (database table)
