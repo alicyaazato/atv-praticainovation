@@ -69,6 +69,31 @@ def delete_subject(subject_id: int):
         return False, str(e)
 
 
+# Task 4.3: calls GET /subjects/search with at least one filter
+def search_subjects(q: str, has_overdue_tasks: bool):
+    headers = _auth_headers()
+    if not headers:
+        return None, "Não autenticado"
+    params = {}
+    if q:
+        params["q"] = q
+    if has_overdue_tasks:
+        params["has_overdue_tasks"] = "true"
+    try:
+        resp = requests.get(
+            f"{XANO_BASE_URL}/subjects/search",
+            headers=headers,
+            params=params,
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get("items", []), None
+        return None, f"Erro {resp.status_code}: {resp.text}"
+    except Exception as e:
+        return None, str(e)
+
+
 # ── Page ─────────────────────────────────────────────────────────────────────
 
 st.title("Gestão de Disciplinas")
@@ -77,7 +102,7 @@ if not st.session_state.get("auth_token"):
     st.warning("Você precisa estar autenticado para acessar esta página.")
     st.stop()
 
-tab_lista, tab_nova = st.tabs(["📋 Minhas Disciplinas", "➕ Nova Disciplina"])
+tab_lista, tab_busca, tab_nova = st.tabs(["📋 Minhas Disciplinas", "🔍 Buscar", "➕ Nova Disciplina"])
 
 # ── Tab: list ─────────────────────────────────────────────────────────────────
 
@@ -157,6 +182,48 @@ with tab_lista:
                             st.success(f"Disciplina '{subj.get('name')}' excluída.")
                             st.session_state.pop("subjects_cache", None)
                             st.rerun()
+
+# ── Tab: search ───────────────────────────────────────────────────────────────
+
+with tab_busca:
+    st.subheader("Buscar Disciplinas")
+
+    # Task 4.2: search controls
+    with st.form("form_busca"):
+        busca_nome = st.text_input("Buscar por nome", placeholder="Ex: Cálculo")
+        busca_atrasadas = st.checkbox("Mostrar disciplinas com tarefas atrasadas")
+        buscar_btn = st.form_submit_button("🔍 Buscar")
+
+    if buscar_btn:
+        if not busca_nome and not busca_atrasadas:
+            st.warning("Informe um nome ou marque 'tarefas atrasadas' para buscar.")
+        else:
+            resultados, err = search_subjects(busca_nome.strip(), busca_atrasadas)
+            if err:
+                st.error(f"Erro na busca: {err}")
+            # Task 4.5: informative message on empty results
+            elif not resultados:
+                st.info("Nenhuma disciplina encontrada com os filtros informados.")
+            else:
+                st.write(f"**{len(resultados)} disciplina(s) encontrada(s)**")
+                # Task 4.4: cards with name, code and overdue indicator.
+                # The indicator is only accurate when overdue was the sole filter —
+                # in combined mode (q + atrasadas) we cannot tell which match came from which filter.
+                only_overdue_filter = busca_atrasadas and not busca_nome
+                for subj in resultados:
+                    label = f"📘 {subj.get('name', '—')}"
+                    if only_overdue_filter:
+                        label += "  ⚠️ com tarefas atrasadas"
+                    with st.expander(label, expanded=False):
+                        st.write(f"**ID:** {subj.get('id')}")
+                        st.write(f"**Código:** {subj.get('code') or '—'}")
+                        st.write(f"**Descrição:** {subj.get('description') or '—'}")
+                        st.write(
+                            f"**Semestre:** {subj.get('semester') or '—'}  |  "
+                            f"**Ano:** {subj.get('year') or '—'}  |  "
+                            f"**Créditos:** {subj.get('credits') or '—'}"
+                        )
+                        st.write(f"**Status:** {subj.get('status') or '—'}")
 
 # ── Tab: create ───────────────────────────────────────────────────────────────
 
