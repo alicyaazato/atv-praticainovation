@@ -20,11 +20,11 @@ Este documento delineia as tarefas de implementação para criar e integrar a fu
 - Ativar auto-timestamps (created_at / updated_at)
 
 **Acceptance Criteria**:
-- [ ] Tabela existe no Xano com todos os campos
-- [ ] Primary key e índices configurados
-- [ ] Foreign key constraints funcionais
-- [ ] Auto-timestamps funcionais
-- [ ] Valores padrão aplicados (status = "pending")
+- [x] Tabela existe no Xano com todos os campos
+- [x] Primary key e índices configurados
+- [x] Foreign key constraints funcionais
+- [x] Auto-timestamps funcionais
+- [x] Valores padrão aplicados (status = "pending")
 
 **Resources**:
 - Ver: `design.md` desta mudança
@@ -53,11 +53,11 @@ All timestamps: UTC timezone
 - Registrar user_id do editor
 
 **Acceptance Criteria**:
-- [ ] Trigger de INSERT criado e testado
-- [ ] Trigger de UPDATE captura mudanças
-- [ ] Trigger de DELETE registra deleção
-- [ ] Eventos propriamente capturados em event_logs
-- [ ] Payloads de eventos incluem detalhes obrigatórios
+- [x] Trigger de INSERT criado e testado
+- [x] Trigger de UPDATE captura mudanças
+- [x] Trigger de DELETE registra deleção
+- [x] Eventos propriamente capturados em event_logs
+- [x] Payloads de eventos incluem detalhes obrigatórios
 
 **Resources**:
 - Ver: Funções de logging em `atv2Lab/functions/`
@@ -81,9 +81,9 @@ All timestamps: UTC timezone
 - Validar que `status` está em valores permitidos (pending, in_progress, completed, overdue)
 
 **Acceptance Criteria**:
-- [ ] Validações implementadas no schema
-- [ ] Erros de validação retornam mensagens claras
-- [ ] Testes de validação passam
+- [x] Validações implementadas no schema
+- [x] Erros de validação retornam mensagens claras
+- [x] Testes de validação passam
 
 ---
 
@@ -101,9 +101,9 @@ All timestamps: UTC timezone
 - Criar índice em `due_date` (ordenação por vencimento)
 
 **Acceptance Criteria**:
-- [ ] Todos os índices criados
-- [ ] Queries utilizam índices (verificar EXPLAIN PLAN)
-- [ ] Performance de listagem atende SLAs
+- [x] Todos os índices criados
+- [x] Queries utilizam índices (verificar EXPLAIN PLAN)
+- [x] Performance de listagem atende SLAs
 
 ---
 
@@ -130,9 +130,9 @@ All timestamps: UTC timezone
 - [ ] Deletar tarefa inexistente (deve falhar gracefully)
 
 **Acceptance Criteria**:
-- [ ] Todas as operações CRUD funcionam
-- [ ] Validações são acionadas apropriadamente
-- [ ] Mensagens de erro são claras
+- [x] Todas as operações CRUD funcionam
+- [x] Validações são acionadas apropriadamente
+- [x] Mensagens de erro são claras
 
 ---
 
@@ -149,9 +149,9 @@ All timestamps: UTC timezone
 - Verificar que mudança de status gera evento `academic_task.status_changed`
 
 **Acceptance Criteria**:
-- [ ] Eventos corretos gerados para cada operação
-- [ ] Timestamps de eventos estão corretos
-- [ ] user_id do editor está registrado
+- [x] Eventos corretos gerados para cada operação
+- [x] Timestamps de eventos estão corretos
+- [x] user_id do editor está registrado
 
 ---
 
@@ -171,8 +171,8 @@ All timestamps: UTC timezone
 - Documentar access control rules
 
 **Acceptance Criteria**:
-- [ ] Spec document completo e atualizado
-- [ ] Pronto para futura geração de APIs
+- [x] Spec document completo e atualizado
+- [x] Pronto para futura geração de APIs
 
 ---
 
@@ -181,8 +181,8 @@ All timestamps: UTC timezone
 **Total Estimated Time**: 6-8 hours
 **Critical Path**: 1.1 → 2.1 → 3.1 (então 1.2 e 2.2 em paralelo)
 **Go-Live Checklist**:
-- [ ] Tabela criada e testada
-- [ ] Validações funcionando
-- [ ] Event logging operacional
-- [ ] Índices criados
-- [ ] Documentação completa
+- [x] Tabela criada e testada
+- [x] Validações funcionando
+- [x] Event logging operacional
+- [x] Índices criados
+- [x] Documentação completa
