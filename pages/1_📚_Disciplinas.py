@@ -1,9 +1,28 @@
+import os
+
 import streamlit as st
 import requests
 
 st.set_page_config(page_title="Disciplinas", page_icon="📚")
 
-XANO_BASE_URL = "https://x8ki-letl-twmt.n7.xano.io/api:v1"
+def load_dotenv(dotenv_path=".env"):
+    if not os.path.exists(dotenv_path):
+        return
+    with open(dotenv_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"\'')
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+load_dotenv()
+
+XANO_BASE_URL = os.getenv("XANO_API_SUBJECTS")
+
 
 def _auth_headers():
     token = st.session_state.get("auth_token")
@@ -17,7 +36,7 @@ def fetch_subjects():
     if not headers:
         return None, "Não autenticado"
     try:
-        resp = requests.get(f"{XANO_BASE_URL}/subjects/my", headers=headers, timeout=10)
+        resp = requests.get(f"{XANO_BASE_URL}/subjects", headers=headers, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             return data.get("items", []), None
@@ -69,7 +88,6 @@ def delete_subject(subject_id: int):
         return False, str(e)
 
 
-# Task 4.3: calls GET /subjects/search with at least one filter
 def search_subjects(q: str, has_overdue_tasks: bool):
     headers = _auth_headers()
     if not headers:
@@ -100,11 +118,12 @@ st.title("Gestão de Disciplinas")
 
 if not st.session_state.get("auth_token"):
     st.warning("Você precisa estar autenticado para acessar esta página.")
+    st.info("Acesse a página **👤 Perfil** para fazer login ou criar uma conta.")
     st.stop()
 
 tab_lista, tab_busca, tab_nova = st.tabs(["📋 Minhas Disciplinas", "🔍 Buscar", "➕ Nova Disciplina"])
 
-# ── Tab: list ─────────────────────────────────────────────────────────────────
+# ── Tab: listar ───────────────────────────────────────────────────────────────
 
 with tab_lista:
     if st.button("🔄 Atualizar", key="refresh_list"):
@@ -130,37 +149,31 @@ with tab_lista:
                 col_info, col_actions = st.columns([3, 1])
 
                 with col_info:
-                    st.write(f"**Código:** {subj.get('code') or '—'}")
-                    st.write(f"**Descrição:** {subj.get('description') or '—'}")
-                    st.write(f"**Semestre:** {subj.get('semester') or '—'}  |  **Ano:** {subj.get('year') or '—'}")
-                    st.write(f"**Créditos:** {subj.get('credits') or '—'}  |  **Status:** {subj.get('status') or '—'}")
+                    st.write(f"**Professor:** {subj.get('professor') or '—'}")
+                    st.write(f"**Carga Horária:** {subj.get('CargaHoraria') or '—'} h")
 
                 with col_actions:
-                    # ── Edit form ──────────────────────────────────────────
                     with st.form(key=f"edit_{subj_id}"):
                         st.markdown("**Editar**")
                         new_name = st.text_input("Nome", value=subj.get("name", ""), key=f"name_{subj_id}")
-                        new_code = st.text_input("Código", value=subj.get("code") or "", key=f"code_{subj_id}")
-                        new_desc = st.text_area("Descrição", value=subj.get("description") or "", key=f"desc_{subj_id}", height=80)
-                        new_credits = st.number_input("Créditos", min_value=0, max_value=20, value=int(subj.get("credits") or 0), key=f"credits_{subj_id}")
-                        new_year = st.number_input("Ano", min_value=1900, max_value=2100, value=int(subj.get("year") or 2024), key=f"year_{subj_id}")
-                        new_status = st.selectbox("Status", ["active", "archived", "draft"], index=["active", "archived", "draft"].index(subj.get("status") or "active"), key=f"status_{subj_id}")
+                        new_prof = st.text_input("Professor", value=subj.get("professor") or "", key=f"prof_{subj_id}")
+                        new_ch = st.number_input(
+                            "Carga Horária (h)",
+                            min_value=0.0,
+                            step=0.5,
+                            value=float(subj.get("CargaHoraria") or 0),
+                            key=f"ch_{subj_id}",
+                        )
                         save_btn = st.form_submit_button("💾 Salvar")
 
                     if save_btn:
                         patch_payload = {}
                         if new_name and new_name != subj.get("name"):
                             patch_payload["name"] = new_name
-                        if new_code != (subj.get("code") or ""):
-                            patch_payload["code"] = new_code
-                        if new_desc != (subj.get("description") or ""):
-                            patch_payload["description"] = new_desc
-                        if new_credits != (subj.get("credits") or 0):
-                            patch_payload["credits"] = new_credits
-                        if new_year != (subj.get("year") or 2024):
-                            patch_payload["year"] = new_year
-                        if new_status != subj.get("status"):
-                            patch_payload["status"] = new_status
+                        if new_prof != (subj.get("professor") or ""):
+                            patch_payload["professor"] = new_prof
+                        if new_ch != float(subj.get("CargaHoraria") or 0):
+                            patch_payload["carga_horaria"] = new_ch
 
                         if patch_payload:
                             _, err = update_subject(subj_id, patch_payload)
@@ -173,7 +186,6 @@ with tab_lista:
                         else:
                             st.info("Nenhuma alteração detectada.")
 
-                    # ── Delete button ──────────────────────────────────────
                     if st.button("🗑️ Excluir", key=f"del_{subj_id}", type="secondary"):
                         ok, err = delete_subject(subj_id)
                         if err:
@@ -183,12 +195,11 @@ with tab_lista:
                             st.session_state.pop("subjects_cache", None)
                             st.rerun()
 
-# ── Tab: search ───────────────────────────────────────────────────────────────
+# ── Tab: buscar ───────────────────────────────────────────────────────────────
 
 with tab_busca:
     st.subheader("Buscar Disciplinas")
 
-    # Task 4.2: search controls
     with st.form("form_busca"):
         busca_nome = st.text_input("Buscar por nome", placeholder="Ex: Cálculo")
         busca_atrasadas = st.checkbox("Mostrar disciplinas com tarefas atrasadas")
@@ -201,64 +212,43 @@ with tab_busca:
             resultados, err = search_subjects(busca_nome.strip(), busca_atrasadas)
             if err:
                 st.error(f"Erro na busca: {err}")
-            # Task 4.5: informative message on empty results
             elif not resultados:
                 st.info("Nenhuma disciplina encontrada com os filtros informados.")
             else:
                 st.write(f"**{len(resultados)} disciplina(s) encontrada(s)**")
-                # Task 4.4: cards with name, code and overdue indicator.
-                # The indicator is only accurate when overdue was the sole filter —
-                # in combined mode (q + atrasadas) we cannot tell which match came from which filter.
-                only_overdue_filter = busca_atrasadas and not busca_nome
+                only_overdue = busca_atrasadas and not busca_nome
                 for subj in resultados:
                     label = f"📘 {subj.get('name', '—')}"
-                    if only_overdue_filter:
+                    if only_overdue:
                         label += "  ⚠️ com tarefas atrasadas"
                     with st.expander(label, expanded=False):
                         st.write(f"**ID:** {subj.get('id')}")
-                        st.write(f"**Código:** {subj.get('code') or '—'}")
-                        st.write(f"**Descrição:** {subj.get('description') or '—'}")
-                        st.write(
-                            f"**Semestre:** {subj.get('semester') or '—'}  |  "
-                            f"**Ano:** {subj.get('year') or '—'}  |  "
-                            f"**Créditos:** {subj.get('credits') or '—'}"
-                        )
-                        st.write(f"**Status:** {subj.get('status') or '—'}")
+                        st.write(f"**Professor:** {subj.get('professor') or '—'}")
+                        st.write(f"**Carga Horária:** {subj.get('CargaHoraria') or '—'} h")
 
-# ── Tab: create ───────────────────────────────────────────────────────────────
+# ── Tab: nova disciplina ──────────────────────────────────────────────────────
 
 with tab_nova:
     st.subheader("Cadastrar Nova Disciplina")
     with st.form("form_nova_disciplina"):
         nome = st.text_input("Nome da Disciplina *", placeholder="Ex: Cálculo I")
-        codigo = st.text_input("Código", placeholder="Ex: MAT101")
-        descricao = st.text_area("Descrição", placeholder="Descrição opcional...", height=100)
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            creditos = st.number_input("Créditos", min_value=0, max_value=20, value=0)
-        with col2:
-            ano = st.number_input("Ano", min_value=1900, max_value=2100, value=2024)
-        with col3:
-            semestre = st.selectbox("Semestre", ["", "1", "2", "3", "4", "5", "6", "7", "8", "full-year"])
-        status = st.selectbox("Status", ["active", "archived", "draft"])
+        professor = st.text_input("Professor *", placeholder="Ex: Prof. João Silva")
+        carga_horaria = st.number_input("Carga Horária (h) *", min_value=0.0, step=0.5, value=0.0)
         submitted = st.form_submit_button("✅ Cadastrar Disciplina")
 
     if submitted:
         if not nome or len(nome.strip()) < 3:
             st.error("O nome da disciplina é obrigatório (mínimo 3 caracteres).")
+        elif not professor or len(professor.strip()) < 3:
+            st.error("O nome do professor é obrigatório (mínimo 3 caracteres).")
+        elif carga_horaria <= 0:
+            st.error("A carga horária deve ser maior que zero.")
         else:
-            payload = {"name": nome.strip(), "status": status}
-            if codigo:
-                payload["code"] = codigo.strip()
-            if descricao:
-                payload["description"] = descricao.strip()
-            if creditos:
-                payload["credits"] = creditos
-            if ano:
-                payload["year"] = ano
-            if semestre:
-                payload["semester"] = semestre
-
+            payload = {
+                "name": nome.strip(),
+                "professor": professor.strip(),
+                "carga_horaria": carga_horaria,
+            }
             _, err = create_subject(payload)
             if err:
                 st.error(f"Erro ao cadastrar: {err}")
