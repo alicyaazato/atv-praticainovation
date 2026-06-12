@@ -5,6 +5,7 @@ from datetime import date, timedelta
 import streamlit as st
 
 from utils.api_client import (
+    PRIORITY_LABELS,
     STATUS_LABELS,
     fetch_subjects,
     fetch_tasks,
@@ -38,16 +39,23 @@ subject_map = {s["id"]: s.get("name", "—") for s in subjects}
 
 st.subheader("Progresso por Disciplina")
 
-for s in subjects:
-    subj_tasks = [t for t in tasks if t.get("subject_id") == s["id"]]
-    if subj_tasks:
-        completed = sum(1 for t in subj_tasks if t.get("status") == "Completa")
-        rate = completed / len(subj_tasks)
-        st.write(f"**{s.get('name', '—')}** — {completed}/{len(subj_tasks)} tarefas concluídas")
-    else:
-        rate = 0.0
-        st.write(f"**{s.get('name', '—')}** — sem tarefas")
-    st.progress(rate)
+incluir_arquivadas = st.checkbox("Incluir disciplinas arquivadas")
+
+subjects_progresso = subjects if incluir_arquivadas else [s for s in subjects if s.get("status", "ativo") == "ativo"]
+
+if not subjects_progresso:
+    st.caption("Nenhuma disciplina ativa.")
+else:
+    for s in subjects_progresso:
+        subj_tasks = [t for t in tasks if t.get("subject_id") == s["id"]]
+        if subj_tasks:
+            completed = sum(1 for t in subj_tasks if t.get("status") == "Completa")
+            rate = completed / len(subj_tasks)
+            st.write(f"**{s.get('name', '—')}** — {completed}/{len(subj_tasks)} tarefas concluídas")
+        else:
+            rate = 0.0
+            st.write(f"**{s.get('name', '—')}** — sem tarefas")
+        st.progress(rate)
 
 st.divider()
 
@@ -90,6 +98,7 @@ else:
             "Título": t.get("title", "—"),
             "Disciplina": subject_map.get(t.get("subject_id"), "—"),
             "Status": STATUS_LABELS.get(t.get("status"), t.get("status")),
+            "Prioridade": PRIORITY_LABELS.get(t.get("priority", "Media"), t.get("priority")),
             "Prazo": fmt_due(t.get("data")),
             "Atrasada": "Sim" if is_overdue(t) else "Não",
         }

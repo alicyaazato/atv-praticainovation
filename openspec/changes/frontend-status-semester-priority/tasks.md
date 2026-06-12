@@ -10,6 +10,9 @@ mudança adicional no Xano é necessária.
 **Ordem recomendada**: Phase 1 (helpers compartilhados) bloqueia as demais.
 Phases 2 e 3 podem ser feitas em paralelo. Phases 4 e 5 dependem de 1, 2 e 3.
 
+**Status**: todas as Fases (1 a 5) foram implementadas e validadas via
+`AppTest` + Xano API (contas de teste descartáveis).
+
 ---
 
 ## Phase 1: `utils/api_client.py` — labels e helper compartilhados
@@ -210,7 +213,9 @@ Phases 2 e 3 podem ser feitas em paralelo. Phases 4 e 5 dependem de 1, 2 e 3.
 - Adicionar `"Prioridade"` ao dict `linhas` do histórico de tarefas.
 
 **Acceptance Criteria**:
-- [ ] Coluna "Prioridade" aparece na tabela e no CSV exportado
+- [x] Coluna "Prioridade" aparece na tabela e no CSV exportado — testado via
+      `AppTest`: `st.dataframe` inclui a coluna `"Prioridade"` com o valor
+      `"Alta"` para a tarefa correspondente (CSV usa as mesmas `linhas`)
 
 ### Task 5.2: Checkbox "Incluir disciplinas arquivadas"
 **Priority**: P2 - Média
@@ -220,9 +225,11 @@ Phases 2 e 3 podem ser feitas em paralelo. Phases 4 e 5 dependem de 1, 2 e 3.
   `status == "arquivado"` da seção "Progresso por Disciplina".
 
 **Acceptance Criteria**:
-- [ ] Por padrão, disciplinas arquivadas não aparecem em "Progresso por
-      Disciplina"
-- [ ] Marcando o checkbox, elas voltam a aparecer
+- [x] Por padrão, disciplinas arquivadas não aparecem em "Progresso por
+      Disciplina" — testado via `AppTest`: com checkbox desmarcado (default),
+      só "Materia Ativa R5" aparece
+- [x] Marcando o checkbox, elas voltam a aparecer — testado via `AppTest`:
+      com checkbox marcado, "Materia Arquivada R5" também aparece
 
 ---
 
