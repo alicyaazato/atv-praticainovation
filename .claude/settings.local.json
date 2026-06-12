@@ -2,7 +2,17 @@
   "permissions": {
     "allow": [
       "Bash(openspec new *)",
-      "Bash(openspec status *)"
+      "Bash(openspec status *)",
+      "Bash(xxd)",
+      "Bash(git add *)",
+      "Bash(git checkout *)",
+      "Bash(git commit *)",
+      "PowerShell(gh auth *)",
+      "PowerShell(winget install *)",
+      "Bash(git status *)",
+      "Bash(gh pr *)",
+      "PowerShell(gh pr *)",
+      "Bash(git ls-remote *)"
     ]
   }
 }

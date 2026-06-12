@@ -36,11 +36,11 @@ estava com marcadores de conflito de merge não resolvidos.
 
 ## Fase 1 — Módulo compartilhado `utils/api_client.py`
 
-Centraliza o que hoje está duplicado em cada página (`load_dotenv`, headers
-de auth, chamadas `requests`):
+Centraliza o que hoje está duplicado em cada página (headers de auth,
+chamadas `requests`):
 
-- `load_dotenv()` via `python-dotenv` (dependência já existente, não usada)
-- Constantes de URL (`AUTH_URL`, `EDIT_URL`, `SUBJECTS_URL`, `TASKS_URL`)
+- Constantes de URL fixas no código (`AUTH_URL`, `EDIT_URL`, `SUBJECTS_URL`,
+  `TASKS_URL`) — projeto de faculdade não usa `.env`
 - `STATUS_LABELS` (fonte única, conforme `agent-estrutura.md`)
 - Helpers de sessão: `get_token`, `set_token`, `clear_token`, `is_authenticated`
 - `request()`: wrapper genérico que trata `401` limpando a sessão

@@ -17,14 +17,16 @@ query "reset/request-reset-link" verb=GET {
       error = "Magic link could not be created. Try again."
     }
   
-    // Create a variable with the API base URL
-    var $api_base_url {
-      value = $env.$api_baseurl
+    // URL pública do app Streamlit (EduTrack AI). Atualize aqui se o app
+    // mudar de endereço (ex: deploy no Streamlit Community Cloud).
+    var $app_base_url {
+      value = "http://179.110.58.64:8765"
     }
   
-    // Create magic link
+    // Create magic link (abre direto na página de Perfil, que lê
+    // magic_token/email da query string para logar e trocar a senha)
     var $magic_link {
-      value = $api_base_url ~ "/1_start_here_demo_page#/update-password" ~ "?magic_token=" ~ $token_and_email.token ~ "&email=" ~ $token_and_email.email
+      value = $app_base_url ~ "/?magic_token=" ~ $token_and_email.token ~ "&email=" ~ $token_and_email.email
     }
   
     // Create HTML message to include magic reset password link

@@ -8,6 +8,11 @@ query subjects verb=POST {
     text name filters=trim
     text professor filters=trim
     decimal carga_horaria
+    enum status?=ativo {
+      values = ["rascunho", "ativo", "arquivado"]
+    }
+  
+    text semester? filters=trim
   }
 
   stack {
@@ -33,12 +38,15 @@ query subjects verb=POST {
     }
   
     db.add subject {
+      enforce_hidden_fields = false
       data = {
         created_at  : "now"
         name        : $input.name
         professor   : $input.professor
         CargaHoraria: $input.carga_horaria
         user_id     : $auth.id
+        status      : $input.status
+        semester    : $input.semester
       }
     } as $new_subject
   }

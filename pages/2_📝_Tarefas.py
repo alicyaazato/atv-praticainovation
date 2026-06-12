@@ -3,6 +3,10 @@ from datetime import date
 import streamlit as st
 
 from utils.api_client import (
+    PRIORITY_ICONS,
+    PRIORITY_LABELS,
+    PRIORITY_OPTIONS,
+    PRIORITY_WEIGHT,
     STATUS_LABELS,
     STATUS_OPTIONS,
     build_task_payload,
@@ -50,6 +54,12 @@ with tab_nova:
                 options=[s["id"] for s in subjects],
                 format_func=lambda i: subject_map.get(i, f"ID {i}"),
             )
+            prioridade = st.selectbox(
+                "Prioridade",
+                options=PRIORITY_OPTIONS,
+                index=PRIORITY_OPTIONS.index("Media"),
+                format_func=lambda p: PRIORITY_LABELS[p],
+            )
             submitted = st.form_submit_button("✅ Cadastrar Tarefa")
 
         if submitted:
@@ -61,6 +71,7 @@ with tab_nova:
                     "description": descricao.strip(),
                     "data": to_xano_due(prazo),
                     "subject_id": disciplina_id,
+                    "priority": prioridade,
                 }
                 _, err = create_task(payload)
                 if err:
@@ -72,14 +83,16 @@ with tab_nova:
 # ── Tab: lista ────────────────────────────────────────────────────────────────
 
 with tab_lista:
-    col_a, col_b, col_c = st.columns([1, 1, 1])
+    col_a, col_b, col_c, col_d = st.columns([1, 1, 1, 1])
     with col_a:
         if st.button("🔄 Atualizar", key="refresh_tasks"):
             st.session_state.pop("tasks_cache", None)
     with col_b:
-        agrupar_por = st.selectbox("Agrupar por", ["Disciplina", "Prazo"])
+        agrupar_por = st.selectbox("Agrupar por", ["Disciplina", "Prazo", "Prioridade"])
     with col_c:
         filtro_status = st.selectbox("Status", ["Todas"] + list(STATUS_LABELS.values()))
+    with col_d:
+        filtro_prioridade = st.selectbox("Prioridade", ["Todas"] + list(PRIORITY_LABELS.values()))
 
     if "tasks_cache" not in st.session_state:
         tasks, err = fetch_tasks()
@@ -93,6 +106,10 @@ with tab_lista:
     if filtro_status != "Todas":
         tasks = [t for t in tasks if STATUS_LABELS.get(t.get("status")) == filtro_status]
 
+    # filtro por prioridade
+    if filtro_prioridade != "Todas":
+        tasks = [t for t in tasks if PRIORITY_LABELS.get(t.get("priority", "Media")) == filtro_prioridade]
+
     if not tasks:
         st.info("Nenhuma tarefa encontrada.")
     else:
@@ -102,10 +119,16 @@ with tab_lista:
             for t in tasks:
                 chave = subject_map.get(t.get("subject_id"), "Sem disciplina")
                 grupos.setdefault(chave, []).append(t)
-        else:  # Prazo
+        elif agrupar_por == "Prazo":
             for t in tasks:
                 chave = fmt_due(t.get("data"))
                 grupos.setdefault(chave, []).append(t)
+        else:  # Prioridade
+            for p in sorted(PRIORITY_OPTIONS, key=lambda x: -PRIORITY_WEIGHT[x]):
+                label = PRIORITY_LABELS[p]
+                itens_p = [t for t in tasks if t.get("priority", "Media") == p]
+                if itens_p:
+                    grupos[label] = itens_p
 
         for grupo, itens in grupos.items():
             st.markdown(f"### {grupo}")
@@ -113,7 +136,8 @@ with tab_lista:
                 tid = t.get("id")
                 venc = is_overdue(t)
                 status_lbl = STATUS_LABELS.get(t.get("status"), t.get("status"))
-                titulo_exib = f"{'🔴 ' if venc else ''}{t.get('title', '—')} · {status_lbl}"
+                icone_prioridade = PRIORITY_ICONS.get(t.get("priority", "Media"), "")
+                titulo_exib = f"{icone_prioridade} {'🔴 ' if venc else ''}{t.get('title', '—')} · {status_lbl}"
 
                 with st.expander(titulo_exib):
                     if venc:
@@ -146,6 +170,16 @@ with tab_lista:
                             format_func=lambda s: STATUS_LABELS[s],
                             key=f"s_{tid}",
                         )
+                        prioridade_atual = t.get("priority", "Media")
+                        nova_prioridade = st.selectbox(
+                            "Prioridade",
+                            options=PRIORITY_OPTIONS,
+                            index=PRIORITY_OPTIONS.index(prioridade_atual)
+                            if prioridade_atual in PRIORITY_OPTIONS
+                            else PRIORITY_OPTIONS.index("Media"),
+                            format_func=lambda p: PRIORITY_LABELS[p],
+                            key=f"prio_{tid}",
+                        )
                         salvar = st.form_submit_button("💾 Salvar")
 
                     if salvar:
@@ -155,6 +189,7 @@ with tab_lista:
                             description=nova_desc.strip(),
                             data=to_xano_due(novo_prazo),
                             status=novo_status,
+                            priority=nova_prioridade,
                         )
                         _, err = update_task(tid, payload)
                         if err:

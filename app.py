@@ -1,6 +1,9 @@
 import streamlit as st
 
 from utils.api_client import (
+    PRIORITY_ICONS,
+    PRIORITY_LABELS,
+    PRIORITY_OPTIONS,
     STATUS_LABELS,
     fetch_subjects,
     fetch_tasks,
@@ -38,13 +41,14 @@ def dashboard_page():
         return
 
     subject_map = {s["id"]: s.get("name", "—") for s in subjects}
+    subjects_ativas = [s for s in subjects if s.get("status", "ativo") == "ativo"]
 
     pendentes = [t for t in tasks if t.get("status") != "Completa"]
     atrasadas = [t for t in tasks if is_overdue(t)]
 
-    # Progresso geral: média da taxa de conclusão por disciplina (peso igual)
+    # Progresso geral: média da taxa de conclusão por disciplina ativa (peso igual)
     progress_by_subject = {}
-    for s in subjects:
+    for s in subjects_ativas:
         subj_tasks = [t for t in tasks if t.get("subject_id") == s["id"]]
         if subj_tasks:
             completed = sum(1 for t in subj_tasks if t.get("status") == "Completa")
@@ -52,11 +56,11 @@ def dashboard_page():
         else:
             progress_by_subject[s["id"]] = 0.0
 
-    progresso_geral = sum(progress_by_subject.values()) / len(subjects)
+    progresso_geral = sum(progress_by_subject.values()) / len(subjects_ativas) if subjects_ativas else 0.0
 
     # ── Métricas ─────────────────────────────────────────────────────────────
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("📚 Disciplinas", len(subjects))
+    col1.metric("📚 Disciplinas Ativas", len(subjects_ativas))
     col2.metric("📝 Tarefas Pendentes", len(pendentes))
     col3.metric("⚠️ Tarefas Atrasadas", len(atrasadas))
     col4.metric("📈 Progresso Geral", f"{progresso_geral * 100:.0f}%")
@@ -76,9 +80,23 @@ def dashboard_page():
 
     with col_progress:
         st.subheader("Progresso por Disciplina")
-        for s in subjects:
-            st.write(s.get("name", "—"))
-            st.progress(progress_by_subject[s["id"]])
+        if not subjects_ativas:
+            st.caption("Nenhuma disciplina ativa.")
+        else:
+            for s in subjects_ativas:
+                st.write(s.get("name", "—"))
+                st.progress(progress_by_subject[s["id"]])
+
+    col_priority, _ = st.columns(2)
+
+    with col_priority:
+        st.subheader("Tarefas por Prioridade")
+        if not tasks:
+            st.caption("Nenhuma tarefa cadastrada ainda.")
+        else:
+            for p in PRIORITY_OPTIONS:
+                count = sum(1 for t in tasks if t.get("priority", "Media") == p)
+                st.write(f"{PRIORITY_ICONS[p]} **{PRIORITY_LABELS[p]}:** {count}")
 
     st.divider()
 

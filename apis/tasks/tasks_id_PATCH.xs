@@ -8,9 +8,10 @@ query "tasks/{id}" verb=PATCH {
     int id
     text title?
     text description?
-    text due_date?
+    text data?
     text status?
     int subject_id?
+    text priority?
   }
 
   stack {
@@ -19,24 +20,35 @@ query "tasks/{id}" verb=PATCH {
       error = "Autenticacao necessaria"
     }
   
-    db.get "" {
+    db.get academic_task {
       field_name = "id"
       field_value = $input.id
-    } as $task
+      output = [
+        "id"
+        "created_at"
+        "user_id"
+        "subject_id"
+        "title"
+        "description"
+        "status"
+        "data"
+        "priority"
+      ]
+    } as $academic_task1
   
-    precondition ($task != null) {
+    precondition ($academic_task1 != null) {
       error_type = "notfound"
       error = "Tarefa nao encontrada"
     }
   
-    precondition ($task.user_id == $auth.id) {
+    precondition ($academic_task1.user_id == $auth.id) {
       error_type = "accessdenied"
       error = "Acesso negado: voce nao e o dono desta tarefa"
     }
   
     // Resolve cada campo: usa o valor enviado ou mantem o atual
     var $final_title {
-      value = $task.title
+      value = $academic_task1.title
     }
   
     conditional {
@@ -48,7 +60,7 @@ query "tasks/{id}" verb=PATCH {
     }
   
     var $final_desc {
-      value = $task.description
+      value = $academic_task1.description
     }
   
     conditional {
@@ -60,19 +72,19 @@ query "tasks/{id}" verb=PATCH {
     }
   
     var $final_due {
-      value = $task.due_date
+      value = $academic_task1.data
     }
   
     conditional {
-      if ($input.due_date != null) {
+      if ($input.data != null) {
         var.update $final_due {
-          value = $input.due_date
+          value = $input.data
         }
       }
     }
   
     var $final_status {
-      value = $task.status
+      value = $academic_task1.status
     }
   
     conditional {
@@ -84,7 +96,7 @@ query "tasks/{id}" verb=PATCH {
     }
   
     var $final_subject {
-      value = $task.subject_id
+      value = $academic_task1.subject_id
     }
   
     conditional {
@@ -95,18 +107,32 @@ query "tasks/{id}" verb=PATCH {
       }
     }
   
-    db.edit "" {
+    var $final_priority {
+      value = $academic_task1.priority
+    }
+  
+    conditional {
+      if ($input.priority != null) {
+        var.update $final_priority {
+          value = $input.priority
+        }
+      }
+    }
+  
+    db.edit academic_task {
       field_name = "id"
       field_value = $input.id
       data = {
+        user_id    : $auth.id
+        subject_id : $final_subject
         title      : $final_title
         description: $final_desc
-        due_date   : $final_due
         status     : $final_status
-        subject_id : $final_subject
+        data       : $final_due
+        priority   : $final_priority
       }
-    } as $updated
+    } as $academic_task
   }
 
-  response = {data: $updated}
+  response = {data: $academic_task}
 }

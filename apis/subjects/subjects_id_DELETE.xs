@@ -8,11 +8,7 @@ query "subjects/{id}" verb=DELETE {
   }
 
   stack {
-<<<<<<<
-    precondition ($auth.id) {
-=======
     precondition ($auth.id != null) {
->>>>>>>
       error_type = "accessdenied"
       error = "Autenticacao necessaria"
     }

@@ -2,19 +2,16 @@
 entre as páginas do EduTrack AI (Streamlit).
 """
 
-import os
 from datetime import date, datetime
 
 import requests
 import streamlit as st
-from dotenv import load_dotenv
 
-load_dotenv()
-
-AUTH_URL = os.getenv("XANO_API_AUTH")
-EDIT_URL = os.getenv("XANO_API_EDIT")
-SUBJECTS_URL = os.getenv("XANO_API_SUBJECTS")
-TASKS_URL = os.getenv("XANO_API_TASKS")
+# URLs base da API Xano (workspace edutrack-ai, branch v1)
+AUTH_URL = "https://x8ki-letl-twmt.n7.xano.io/api:OwEMGCzd"
+EDIT_URL = "https://x8ki-letl-twmt.n7.xano.io/api:PIgO5Chd"
+SUBJECTS_URL = "https://x8ki-letl-twmt.n7.xano.io/api:zwpAOwnh"
+TASKS_URL = "https://x8ki-letl-twmt.n7.xano.io/api:FJtu6_X0"
 
 # status interno (vindo da API) -> rótulo exibido
 STATUS_LABELS = {
@@ -24,6 +21,26 @@ STATUS_LABELS = {
     "Atrasada": "Atrasada",
 }
 STATUS_OPTIONS = list(STATUS_LABELS.keys())
+
+# subject.status interno -> rótulo exibido
+SUBJECT_STATUS_LABELS = {
+    "rascunho": "Rascunho",
+    "ativo": "Ativo",
+    "arquivado": "Arquivado",
+}
+SUBJECT_STATUS_OPTIONS = list(SUBJECT_STATUS_LABELS.keys())
+
+# academic_task.priority interno -> rótulo exibido
+PRIORITY_LABELS = {
+    "Baixa": "Baixa",
+    "Media": "Média",
+    "Alta": "Alta",
+}
+PRIORITY_OPTIONS = list(PRIORITY_LABELS.keys())
+
+# ícone e peso (para exibição e ordenação) por prioridade
+PRIORITY_ICONS = {"Baixa": "🟢", "Media": "🟡", "Alta": "🔴"}
+PRIORITY_WEIGHT = {"Baixa": 0, "Media": 1, "Alta": 2}
 
 
 # ── Sessão ───────────────────────────────────────────────────────────────────
@@ -122,6 +139,20 @@ def update_subject(subject_id: int, payload: dict):
     return request("PATCH", f"{SUBJECTS_URL}/subjects/{subject_id}", json=payload)
 
 
+def build_subject_payload(subject: dict, **changes) -> dict:
+    """Monta o payload completo a partir da disciplina atual, sobrescrevendo só
+    o que mudou. Garante que nenhum campo seja apagado quando a API não faz merge."""
+    payload = {
+        "name": subject.get("name"),
+        "professor": subject.get("professor"),
+        "carga_horaria": subject.get("CargaHoraria"),
+        "status": subject.get("status", "ativo"),
+        "semester": subject.get("semester", ""),
+    }
+    payload.update(changes)
+    return payload
+
+
 def delete_subject(subject_id: int):
     _, err = request("DELETE", f"{SUBJECTS_URL}/subjects/{subject_id}")
     return err is None, err
@@ -207,6 +238,7 @@ def build_task_payload(task: dict, **changes) -> dict:
         "data": task.get("data"),
         "status": task.get("status"),
         "subject_id": task.get("subject_id"),
+        "priority": task.get("priority", "Media"),
     }
     payload.update(changes)
     return payload

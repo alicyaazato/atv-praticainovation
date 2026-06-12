@@ -12,12 +12,22 @@ query tasks verb=GET {
       error = "Autenticacao necessaria"
     }
   
-    db.query "" {
-      where = $db.task.user_id == $auth.id
-      sort = {due_date: "asc"}
-      return = {type: "list", paging: {page: 1, per_page: 200}}
-    } as $tasks
+    db.query academic_task {
+      where = $db.academic_task.user_id == $auth.id
+      return = {type: "list"}
+      output = [
+        "id"
+        "created_at"
+        "user_id"
+        "subject_id"
+        "title"
+        "description"
+        "status"
+        "data"
+        "priority"
+      ]
+    } as $lista_de_tarefas
   }
 
-  response = {items: $tasks.items}
+  response = {items: $lista_de_tarefas}
 }

@@ -6,12 +6,19 @@ query tasks verb=POST {
   input {
     text title filters=trim
     text description?
-    text due_date?
     int subject_id
+    enum status?=Pendente {
+      values = ["Pendente", "Em_progresso", "Completa", "Atrasada"]
+    }
+  
+    text data filters=trim
+    enum priority?=Media {
+      values = ["Baixa", "Media", "Alta"]
+    }
   }
 
   stack {
-    precondition ($auth.id) {
+    precondition ($auth.id != null) {
       error_type = "accessdenied"
       error = "Autenticacao necessaria"
     }
@@ -22,28 +29,31 @@ query tasks verb=POST {
       field_value = $input.subject_id
     } as $subject
   
-    precondition ($subject != null) {
-      error_type = "notfound"
-      error = "Disciplina nao encontrada"
-    }
-  
-    precondition ($subject.user_id == $auth.id) {
-      error_type = "accessdenied"
-      error = "Voce nao e o dono desta disciplina"
-    }
-  
-    db.add "" {
+    !precondition ()
+    db.add academic_task {
       data = {
-        created_at : "now"
+        user_id    : $auth.id
+        subject_id : $input.subject_id
         title      : $input.title
         description: $input.description
-        due_date   : $input.due_date
-        status     : "pendente"
-        subject_id : $input.subject_id
-        user_id    : $auth.id
+        status     : $input.status
+        data       : $input.data
+        priority   : $input.priority
       }
-    } as $new_task
+    
+      output = [
+        "id"
+        "created_at"
+        "user_id"
+        "subject_id"
+        "title"
+        "description"
+        "status"
+        "data"
+        "priority"
+      ]
+    } as $adcionar_tarefa
   }
 
-  response = {data: $new_task}
+  response = {item: $adcionar_tarefa}
 }

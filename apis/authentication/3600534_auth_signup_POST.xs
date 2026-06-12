@@ -23,6 +23,7 @@ query "auth/signup" verb=POST {
   
     // Create a new user record
     db.add user {
+      enforce_hidden_fields = false
       data = {
         created_at: "now"
         name      : $input.name

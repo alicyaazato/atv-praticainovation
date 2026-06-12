@@ -8,6 +8,8 @@ query "subjects/{id}" verb=PATCH {
     text name?
     text professor?
     decimal carga_horaria?
+    text status?
+    text semester?
   }
 
   stack {
@@ -68,13 +70,40 @@ query "subjects/{id}" verb=PATCH {
       }
     }
   
+    var $final_status {
+      value = $subject.status
+    }
+  
+    conditional {
+      if ($input.status != null) {
+        var.update $final_status {
+          value = $input.status
+        }
+      }
+    }
+  
+    var $final_semester {
+      value = $subject.semester
+    }
+  
+    conditional {
+      if ($input.semester != null) {
+        var.update $final_semester {
+          value = $input.semester
+        }
+      }
+    }
+  
     db.edit subject {
       field_name = "id"
       field_value = $input.id
+      enforce_hidden_fields = false
       data = {
         name        : $final_name
         professor   : $final_professor
         CargaHoraria: $final_ch
+        status      : $final_status
+        semester    : $final_semester
       }
     } as $updated
   }

@@ -13,29 +13,26 @@ query "tasks/{id}" verb=DELETE {
       error = "Autenticacao necessaria"
     }
   
-    db.get "" {
+    db.get academic_task {
       field_name = "id"
       field_value = $input.id
-    } as $task
+    } as $academic_task1
   
-    precondition ($task != null) {
+    precondition ($academic_task1 != null) {
       error_type = "notfound"
       error = "Tarefa nao encontrada"
     }
   
-    precondition ($task.user_id == $auth.id) {
+    precondition ($academic_task1.user_id == $auth.id) {
       error_type = "accessdenied"
       error = "Acesso negado: voce nao e o dono desta tarefa"
     }
   
-    db.del "" {
+    db.del academic_task {
       field_name = "id"
       field_value = $input.id
     }
   }
 
-  response = {
-    message: "Tarefa excluida com sucesso"
-    data   : {id: $input.id}
-  }
+  response = {message: "Tarefa excluida com sucesso", data: ``}
 }
