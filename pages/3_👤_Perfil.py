@@ -1,135 +1,70 @@
-import os
-
 import streamlit as st
-import requests
 
-
-def load_dotenv(dotenv_path=".env"):
-    if os.path.exists(dotenv_path):
-        with open(dotenv_path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, value = line.split("=", 1)
-                key = key.strip()
-                value = value.strip().strip('"').strip("'")
-                if key and key not in os.environ:
-                    os.environ[key] = value
-
-load_dotenv()
-
-xano_url_login_singup = os.getenv("XANO_API_AUTH")
-xano_url_edit = os.getenv("XANO_API_EDIT")
-
-TOKEN_SESSAO = None
-
-
-
-def _headers():
-    return {
-        "Authorization": f"Bearer {TOKEN_SESSAO}",
-        "Content-Type": "application/json",
-    }
-
-
-def cadastrar_usuario(nome, email, senha):
-    global TOKEN_SESSAO
-    try:
-        response = requests.post(f"{xano_url_login_singup}/auth/signup",
-                                 json={"name": nome, "email": email, "password": senha})
-        data = response.json()
-        if response.status_code != 200:
-            return {"numErro": 1, "mensagem": data.get("message", "Erro no cadastro")}
-        TOKEN_SESSAO = data.get("authToken")
-        return {"numErro": 0, "mensagem": "Usuário cadastrado com sucesso!"}
-    except requests.exceptions.RequestException as e:
-        return {"numErro": 1, "mensagem": f"Erro de conexão: {str(e)}"}
-
-
-def login_usuario(email, senha):
-    global TOKEN_SESSAO
-    try:
-        response = requests.post(f"{xano_url_login_singup}/auth/login",
-                                 json={"email": email, "password": senha})
-        data = response.json()
-        if response.status_code != 200:
-            return {"numErro": 1, "mensagem": data.get("message", "E-mail ou senha incorretos")}
-        TOKEN_SESSAO = data.get("authToken")
-        return {"numErro": 0, "mensagem": "Login realizado com sucesso!"}
-    except requests.exceptions.RequestException as e:
-        return {"numErro": 1, "mensagem": f"Erro de conexão: {str(e)}"}
-
-
-def obter_perfil_objeto():
-    if not TOKEN_SESSAO:
-        return {"numErro": 1, "mensagem": "Usuário não autenticado."}
-    try:
-        response = requests.get(f"{xano_url_login_singup}/auth/me", headers=_headers())
-        data = response.json()
-        if response.status_code != 200:
-            return {"numErro": 1, "mensagem": "Erro ao carregar dados do perfil"}
-        return {"numErro": 0, "dados": data}
-    except requests.exceptions.RequestException as e:
-        return {"numErro": 1, "mensagem": f"Erro de conexão: {str(e)}"}
-
-
-def editar_perfil(nome, email):
-    """PATCH /user/edit_profile — atualiza nome e/ou e-mail do usuário autenticado."""
-    try:
-        response = requests.patch(
-            f"{xano_url_edit}/user/edit_profile",
-            json={"name": nome, "email": email},
-            headers=_headers(),
-            timeout=10,
-        )
-        data = response.json()
-        if response.status_code != 200:
-            return {"numErro": 1, "mensagem": data.get("message", f"Erro {response.status_code}")}
-        return {"numErro": 0, "mensagem": "Perfil atualizado com sucesso!"}
-    except requests.exceptions.RequestException as e:
-        return {"numErro": 1, "mensagem": f"Erro de conexão: {str(e)}"}
-
-
-def alterar_senha(nova_senha, confirmar_senha):
-    """POST /reset/update_password — troca senha do usuário já autenticado."""
-    try:
-        response = requests.post(
-            f"{xano_url_login_singup}/reset/update_password",
-            json={"password": nova_senha, "confirm_password": confirmar_senha},
-            headers=_headers(),
-            timeout=10,
-        )
-        data = response.json()
-        if response.status_code != 200:
-            return {"numErro": 1, "mensagem": data.get("message", f"Erro {response.status_code}")}
-        return {"numErro": 0, "mensagem": "Senha alterada com sucesso!"}
-    except requests.exceptions.RequestException as e:
-        return {"numErro": 1, "mensagem": f"Erro de conexão: {str(e)}"}
-
+from utils.api_client import (
+    change_password,
+    clear_token,
+    edit_profile,
+    get_profile,
+    is_authenticated,
+    login,
+    magic_link_login,
+    request_password_reset,
+    set_token,
+    signup,
+)
 
 # ── Page ──────────────────────────────────────────────────────────────────────
 
-st.set_page_config(page_title="Perfil", page_icon="👤")
 st.title("👤 Perfil")
 
-if "auth_token" not in st.session_state:
-    st.session_state["auth_token"] = None
+# ── Login via magic link (redefinição de senha) ────────────────────────────────
 
-TOKEN_SESSAO = st.session_state["auth_token"]
+qp = st.query_params
+if not is_authenticated() and "magic_token" in qp and "email" in qp:
+    token, err = magic_link_login(qp["magic_token"], qp["email"])
+    if err:
+        st.error(f"Link de redefinição inválido ou expirado: {err}")
+    else:
+        set_token(token)
+        st.session_state["force_password_tab"] = True
+        st.query_params.clear()
+        st.rerun()
 
 # ── Autenticado ───────────────────────────────────────────────────────────────
 
-if TOKEN_SESSAO:
-    resultado = obter_perfil_objeto()
+if is_authenticated():
+    dados, err = get_profile()
 
-    if resultado["numErro"] != 0:
-        st.error(resultado["mensagem"])
-        st.session_state["auth_token"] = None
+    if err:
+        st.error(err)
+        clear_token()
         st.rerun()
 
-    dados = resultado["dados"]
     st.success(f"Bem-vindo, **{dados.get('name', '')}**!")
+
+    if st.session_state.pop("force_password_tab", False):
+        st.info("Você acessou pelo link de redefinição de senha. Defina sua nova senha abaixo.")
+        st.subheader("🔒 Definir nova senha")
+
+        with st.form("form_alterar_senha_magic"):
+            nova_senha_m = st.text_input("Nova senha", type="password", placeholder="Mínimo 8 caracteres", key="nova_senha_magic")
+            conf_senha_m = st.text_input("Confirmar nova senha", type="password", placeholder="••••••••", key="conf_senha_magic")
+            alterar_m = st.form_submit_button("🔒 Alterar senha", use_container_width=True)
+
+        if alterar_m:
+            if not nova_senha_m or not conf_senha_m:
+                st.warning("Preencha os dois campos de senha.")
+            elif len(nova_senha_m) < 8:
+                st.error("A senha deve ter no mínimo 8 caracteres.")
+            elif nova_senha_m != conf_senha_m:
+                st.error("As senhas não coincidem.")
+            else:
+                _, err = change_password(nova_senha_m, conf_senha_m)
+                if err:
+                    st.error(err)
+                else:
+                    st.success("Senha alterada com sucesso!")
+
     st.divider()
 
     tab_perfil, tab_senha = st.tabs(["✏️ Meu Perfil", "🔒 Alterar Senha"])
@@ -155,12 +90,12 @@ if TOKEN_SESSAO:
             if not novo_nome or not novo_email:
                 st.warning("Nome e e-mail são obrigatórios.")
             else:
-                res = editar_perfil(novo_nome.strip(), novo_email.strip())
-                if res["numErro"] == 0:
-                    st.success(res["mensagem"])
-                    st.rerun()
+                _, err = edit_profile(novo_nome.strip(), novo_email.strip())
+                if err:
+                    st.error(err)
                 else:
-                    st.error(res["mensagem"])
+                    st.success("Perfil atualizado com sucesso!")
+                    st.rerun()
 
     # ── Tab: alterar senha ────────────────────────────────────────────────────
     with tab_senha:
@@ -180,20 +115,21 @@ if TOKEN_SESSAO:
             elif nova_senha != conf_senha:
                 st.error("As senhas não coincidem.")
             else:
-                res = alterar_senha(nova_senha, conf_senha)
-                if res["numErro"] == 0:
-                    st.success(res["mensagem"])
+                _, err = change_password(nova_senha, conf_senha)
+                if err:
+                    st.error(err)
                 else:
-                    st.error(res["mensagem"])
+                    st.success("Senha alterada com sucesso!")
 
     st.divider()
     if st.button("Sair", type="secondary"):
-        st.session_state["auth_token"] = None
+        clear_token()
         st.rerun()
 
 # ── Não autenticado: login / registro ─────────────────────────────────────────
 
 else:
+    st.caption("Bem-vindo ao EduTrack AI! Faça login ou crie uma conta para começar.")
     tab_login, tab_registro = st.tabs(["🔑 Login", "📝 Criar conta"])
 
     with tab_login:
@@ -208,13 +144,28 @@ else:
             if not email_login or not senha_login:
                 st.warning("Preencha e-mail e senha.")
             else:
-                resultado = login_usuario(email_login, senha_login)
-                if resultado["numErro"] == 0:
-                    st.session_state["auth_token"] = TOKEN_SESSAO
-                    st.success(resultado["mensagem"])
-                    st.rerun()
+                token, err = login(email_login, senha_login)
+                if err:
+                    st.error(err)
                 else:
-                    st.error(resultado["mensagem"])
+                    set_token(token)
+                    st.success("Login realizado com sucesso!")
+                    st.rerun()
+
+        with st.expander("Esqueci minha senha"):
+            with st.form("form_esqueci_senha"):
+                email_reset = st.text_input("E-mail cadastrado", placeholder="seu@email.com", key="email_reset")
+                enviar_reset = st.form_submit_button("Enviar link de redefinição", use_container_width=True)
+
+            if enviar_reset:
+                if not email_reset:
+                    st.warning("Informe seu e-mail.")
+                else:
+                    _, err = request_password_reset(email_reset.strip())
+                    if err:
+                        st.error(err)
+                    else:
+                        st.success("Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.")
 
     with tab_registro:
         st.subheader("Criar nova conta")
@@ -232,10 +183,10 @@ else:
             elif senha_reg != senha_conf:
                 st.error("As senhas não coincidem.")
             else:
-                resultado = cadastrar_usuario(nome_reg, email_reg, senha_reg)
-                if resultado["numErro"] == 0:
-                    st.session_state["auth_token"] = TOKEN_SESSAO
-                    st.success(resultado["mensagem"])
-                    st.rerun()
+                token, err = signup(nome_reg, email_reg, senha_reg)
+                if err:
+                    st.error(err)
                 else:
-                    st.error(resultado["mensagem"])
+                    set_token(token)
+                    st.success("Usuário cadastrado com sucesso!")
+                    st.rerun()

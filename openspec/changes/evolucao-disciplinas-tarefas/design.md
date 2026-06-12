@@ -1,0 +1,90 @@
+# Evolução das Disciplinas e Tarefas - Design
+
+## Data Model
+
+### Table: subject (`tables/809944_subject.xs`)
+
+Campos novos:
+
+```
+- status: string (enum) - "rascunho" | "ativo" | "arquivado", default "ativo"
+- semester: string (opcional) - período/semestre em texto livre, ex: "2026/1"
+```
+
+Campos atuais (sem alteração): `id`, `created_at`, `name?`, `professor?`,
+`CargaHoraria?`, `user_id?`.
+
+### Table: academic_task (`tables/842368_academic_task.xs`)
+
+Campo novo:
+
+```
+- priority: string (enum) - "Baixa" | "Média" | "Alta", default "Média"
+```
+
+Campo existente a conciliar:
+
+```
+- status: string (enum) - hoje documentado como
+    "pending" | "in_progress" | "completed" | "overdue" (default "pending")
+  mas o front-end (utils/api_client.STATUS_LABELS) usa
+    "Pendente" | "Em_progresso" | "Completa" | "Atrasada"
+```
+
+## Conciliação do enum `status` (academic_task)
+
+Antes de qualquer mudança em `priority` ou em filtros novos:
+
+1. Consultar registros existentes na tabela `academic_task` no Xano e
+   verificar quais valores de `status` estão realmente gravados.
+2. Caso os dados gravados usem as chaves em português (cenário mais
+   provável, já que o front funciona hoje), atualizar
+   `tables/842368_academic_task.xs` para refletir o enum real
+   (`Pendente`, `Em_progresso`, `Completa`, `Atrasada`, default `Pendente`).
+3. Caso existam registros com os dois conjuntos de valores (dados
+   legados), planejar uma migração de normalização antes de habilitar
+   filtros que dependam de `status`.
+4. `utils/api_client.STATUS_LABELS` é a fonte única do lado do front e não
+   deve mudar sem uma migração coordenada no Xano.
+
+## API Endpoints a atualizar
+
+### `apis/subjects/subjects_POST.xs`
+- Aceitar `status` (default `"ativo"` se omitido) e `semester` (opcional).
+- Validar `status` contra o enum `rascunho | ativo | arquivado`.
+
+### `apis/subjects/subjects_id_PATCH.xs` (ou equivalente de update)
+- Aceitar `status` e `semester` como campos parciais.
+- Permitir transição para `arquivado` (usada pela UI para "arquivar
+  disciplina").
+
+### `apis/tasks/tasks_POST.xs`
+- Aceitar `priority` (default `"Média"` se omitido).
+- Validar contra o enum `Baixa | Média | Alta`.
+
+### `apis/tasks/tasks_id_PATCH.xs` (ou equivalente de update)
+- Aceitar `priority` como campo parcial.
+
+## Magic link de redefinição de senha
+
+### `apis/authentication/3600536_reset_request_reset_link_GET.xs`
+- O template de e-mail atualmente monta um link para uma página de demo do
+  Xano.
+- Trocar a URL base para a URL pública do app Streamlit (página
+  **👤 Perfil**), preservando os parâmetros `magic_token` e `email` na
+  query string — ex.: `https://<app-streamlit>/Perfil?magic_token={{magic_token}}&email={{email}}`.
+- O endpoint `apis/authentication/3600537_reset_magic_link_login_POST.xs`
+  e o tratamento em `pages/3_👤_Perfil.py` (via `st.query_params`) já estão
+  prontos para esse fluxo — nenhuma mudança adicional necessária do lado do
+  front.
+
+## Integration Points
+
+1. **Dashboard** (`app.py`): métrica "Disciplinas Ativas" poderá filtrar por
+   `subject.status == "ativo"` após a migração.
+2. **Disciplinas** (`pages/1_📚_Disciplinas.py`): UI de "arquivar disciplina"
+   e exibição de `semester` podem ser adicionadas após os campos existirem.
+3. **Tarefas** (`pages/2_📝_Tarefas.py`): seletor/exibição de `priority` pode
+   ser adicionado ao formulário de criação/edição após o campo existir.
+4. **Relatórios** (`pages/4_📈_Relatorios.py`): filtro por prioridade pode ser
+   adicionado como melhoria futura.
