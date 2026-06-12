@@ -1,125 +1,20 @@
-import os
-
 import streamlit as st
-import requests
 
-st.set_page_config(page_title="Disciplinas", page_icon="📚")
-
-def load_dotenv(dotenv_path=".env"):
-    if not os.path.exists(dotenv_path):
-        return
-    with open(dotenv_path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            key = key.strip()
-            value = value.strip().strip('"\'')
-            if key and key not in os.environ:
-                os.environ[key] = value
-
-load_dotenv()
-
-XANO_BASE_URL = os.getenv("XANO_API_SUBJECTS")
-
-
-def _auth_headers():
-    token = st.session_state.get("auth_token")
-    if not token:
-        return None
-    return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-
-
-def fetch_subjects():
-    headers = _auth_headers()
-    if not headers:
-        return None, "Não autenticado"
-    try:
-        resp = requests.get(f"{XANO_BASE_URL}/subjects", headers=headers, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            return data.get("items", []), None
-        return None, f"Erro {resp.status_code}: {resp.text}"
-    except Exception as e:
-        return None, str(e)
-
-
-def create_subject(payload: dict):
-    headers = _auth_headers()
-    if not headers:
-        return None, "Não autenticado"
-    try:
-        resp = requests.post(f"{XANO_BASE_URL}/subjects", json=payload, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            return resp.json(), None
-        return None, f"Erro {resp.status_code}: {resp.text}"
-    except Exception as e:
-        return None, str(e)
-
-
-def update_subject(subject_id: int, payload: dict):
-    headers = _auth_headers()
-    if not headers:
-        return None, "Não autenticado"
-    try:
-        resp = requests.patch(
-            f"{XANO_BASE_URL}/subjects/{subject_id}", json=payload, headers=headers, timeout=10
-        )
-        if resp.status_code == 200:
-            return resp.json(), None
-        return None, f"Erro {resp.status_code}: {resp.text}"
-    except Exception as e:
-        return None, str(e)
-
-
-def delete_subject(subject_id: int):
-    headers = _auth_headers()
-    if not headers:
-        return False, "Não autenticado"
-    try:
-        resp = requests.delete(
-            f"{XANO_BASE_URL}/subjects/{subject_id}", headers=headers, timeout=10
-        )
-        if resp.status_code == 200:
-            return True, None
-        return False, f"Erro {resp.status_code}: {resp.text}"
-    except Exception as e:
-        return False, str(e)
-
-
-def search_subjects(q: str, has_overdue_tasks: bool):
-    headers = _auth_headers()
-    if not headers:
-        return None, "Não autenticado"
-    params = {}
-    if q:
-        params["q"] = q
-    if has_overdue_tasks:
-        params["has_overdue_tasks"] = "true"
-    try:
-        resp = requests.get(
-            f"{XANO_BASE_URL}/subjects/search",
-            headers=headers,
-            params=params,
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            return data.get("items", []), None
-        return None, f"Erro {resp.status_code}: {resp.text}"
-    except Exception as e:
-        return None, str(e)
-
+from utils.api_client import (
+    confirm_delete_button,
+    create_subject,
+    delete_subject,
+    fetch_subjects,
+    require_session,
+    search_subjects,
+    update_subject,
+)
 
 # ── Page ─────────────────────────────────────────────────────────────────────
 
 st.title("Gestão de Disciplinas")
 
-if not st.session_state.get("auth_token"):
-    st.warning("Você precisa estar autenticado para acessar esta página.")
-    st.info("Acesse a página **👤 Perfil** para fazer login ou criar uma conta.")
-    st.stop()
+require_session()
 
 tab_lista, tab_busca, tab_nova = st.tabs(["📋 Minhas Disciplinas", "🔍 Buscar", "➕ Nova Disciplina"])
 
@@ -186,14 +81,16 @@ with tab_lista:
                         else:
                             st.info("Nenhuma alteração detectada.")
 
-                    if st.button("🗑️ Excluir", key=f"del_{subj_id}", type="secondary"):
-                        ok, err = delete_subject(subj_id)
-                        if err:
-                            st.error(f"Erro ao excluir: {err}")
-                        else:
-                            st.success(f"Disciplina '{subj.get('name')}' excluída.")
-                            st.session_state.pop("subjects_cache", None)
-                            st.rerun()
+                    excluido = confirm_delete_button(
+                        subj_id,
+                        subj.get("name", "—"),
+                        on_confirm=lambda sid=subj_id: delete_subject(sid),
+                        key_prefix="subj",
+                    )
+                    if excluido:
+                        st.success(f"Disciplina '{subj.get('name')}' excluída.")
+                        st.session_state.pop("subjects_cache", None)
+                        st.rerun()
 
 # ── Tab: buscar ───────────────────────────────────────────────────────────────
 

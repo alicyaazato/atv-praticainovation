@@ -1,171 +1,29 @@
-import os
-from datetime import date, datetime
+from datetime import date
 
 import streamlit as st
-import requests
 
-st.set_page_config(page_title="Tarefas", page_icon="📝")
-
-
-def load_dotenv(dotenv_path=".env"):
-    if not os.path.exists(dotenv_path):
-        return
-    with open(dotenv_path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            key = key.strip()
-            value = value.strip().strip('"\'')
-            if key and key not in os.environ:
-                os.environ[key] = value
-
-
-load_dotenv()
-
-TASKS_URL = os.getenv("XANO_API_TASKS")
-SUBJECTS_URL = os.getenv("XANO_API_SUBJECTS")
-
-# status interno -> rótulo exibido
-STATUS_LABELS = {
-    "Pendente": "Pendente",
-    "Em_progresso": "Em progresso",
-    "Completa": "Completa",
-    "Atrasada": "Atrasada"
-}
-STATUS_OPTIONS = list(STATUS_LABELS.keys())
-
-
-def _auth_headers():
-    token = st.session_state.get("auth_token")
-    if not token:
-        return None
-    return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-
-
-def fetch_subjects():
-    headers = _auth_headers()
-    if not headers:
-        return [], "Não autenticado"
-    try:
-        resp = requests.get(f"{SUBJECTS_URL}/subjects", headers=headers, timeout=10)
-        if resp.status_code == 200:
-            return resp.json().get("items", []), None
-        return [], f"Erro {resp.status_code}: {resp.text}"
-    except Exception as e:
-        return [], str(e)
-
-
-def fetch_tasks():
-    headers = _auth_headers()
-    if not headers:
-        return [], "Não autenticado"
-    try:
-        resp = requests.get(f"{TASKS_URL}/tasks", headers=headers, timeout=10)
-        if resp.status_code == 200:
-            return resp.json().get("items", []), None
-        return [], f"Erro {resp.status_code}: {resp.text}"
-    except Exception as e:
-        return [], str(e)
-
-
-def create_task(payload: dict):
-    headers = _auth_headers()
-    if not headers:
-        return None, "Não autenticado"
-    try:
-        resp = requests.post(f"{TASKS_URL}/tasks", json=payload, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            return resp.json(), None
-        return None, f"Erro {resp.status_code}: {resp.text}"
-    except Exception as e:
-        return None, str(e)
-
-
-def update_task(task_id: int, payload: dict):
-    headers = _auth_headers()
-    if not headers:
-        return None, "Não autenticado"
-    try:
-        resp = requests.patch(f"{TASKS_URL}/tasks/{task_id}", json=payload, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            return resp.json(), None
-        return None, f"Erro {resp.status_code}: {resp.text}"
-    except Exception as e:
-        return None, str(e)
-
-
-def delete_task(task_id: int):
-    headers = _auth_headers()
-    if not headers:
-        return False, "Não autenticado"
-    try:
-        resp = requests.delete(f"{TASKS_URL}/tasks/{task_id}", headers=headers, timeout=10)
-        if resp.status_code == 200:
-            return True, None
-        return False, f"Erro {resp.status_code}: {resp.text}"
-    except Exception as e:
-        return False, str(e)
-
-
-def to_xano_due(d: date) -> str:
-    """Converte uma date para o formato brasileiro 'dd/mm/yyyy' (campo texto no Xano)."""
-    return d.strftime("%d/%m/%Y")
-
-
-def parse_due_date(due):
-    """Interpreta o due_date vindo do Xano (dd/mm/yyyy ou ISO) e devolve uma date."""
-    if due is None or due == "":
-        return None
-    texto = str(due).strip()
-    # formato brasileiro dd/mm/yyyy
-    try:
-        return datetime.strptime(texto, "%d/%m/%Y").date()
-    except ValueError:
-        pass
-    # fallback: ISO 'YYYY-MM-DD' (dados antigos)
-    try:
-        return date.fromisoformat(texto[:10])
-    except ValueError:
-        return None
-
-
-def is_overdue(task):
-    """Prazo vencido: data < hoje e tarefa não concluída."""
-    if task.get("status") == "Completa":
-        return False
-    d = parse_due_date(task.get("data"))
-    return d is not None and d < date.today()
-
-
-def fmt_due(due):
-    d = parse_due_date(due)
-    return d.strftime("%d/%m/%Y") if d else "—"
-
-
-def build_task_payload(task: dict, **changes) -> dict:
-    """Monta o payload completo a partir da tarefa atual, sobrescrevendo só o que mudou.
-    Garante que nenhum campo seja apagado quando a API não faz merge."""
-    payload = {
-        "title": task.get("title"),
-        "description": task.get("description"),
-        "data": task.get("data"),
-        "status": task.get("status"),
-        "subject_id": task.get("subject_id"),
-    }
-    payload.update(changes)
-    return payload
-
+from utils.api_client import (
+    STATUS_LABELS,
+    STATUS_OPTIONS,
+    build_task_payload,
+    confirm_delete_button,
+    create_task,
+    delete_task,
+    fetch_subjects,
+    fetch_tasks,
+    fmt_due,
+    is_overdue,
+    parse_due_date,
+    require_session,
+    to_xano_due,
+    update_task,
+)
 
 # ── Página ────────────────────────────────────────────────────────────────────
 
 st.title("📝 Minhas Tarefas")
 
-if not st.session_state.get("auth_token"):
-    st.warning("Você precisa estar autenticado para acessar esta página.")
-    st.info("Acesse a página **👤 Perfil** para fazer login ou criar uma conta.")
-    st.stop()
+require_session()
 
 # carrega disciplinas (para o dropdown e para mapear subject_id -> nome)
 subjects, subj_err = fetch_subjects()
@@ -307,11 +165,13 @@ with tab_lista:
                             st.rerun()
 
                     # excluir
-                    if st.button("🗑️ Excluir", key=f"del_task_{tid}", type="secondary"):
-                        ok, err = delete_task(tid)
-                        if err:
-                            st.error(f"Erro ao excluir: {err}")
-                        else:
-                            st.success("Tarefa excluída.")
-                            st.session_state.pop("tasks_cache", None)
-                            st.rerun()
+                    excluido = confirm_delete_button(
+                        tid,
+                        t.get("title", "—"),
+                        on_confirm=lambda t_id=tid: delete_task(t_id),
+                        key_prefix="task",
+                    )
+                    if excluido:
+                        st.success("Tarefa excluída.")
+                        st.session_state.pop("tasks_cache", None)
+                        st.rerun()
