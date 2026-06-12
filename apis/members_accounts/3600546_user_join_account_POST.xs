@@ -37,6 +37,7 @@ query "user/join_account" verb=POST {
     db.edit user {
       field_name = "id"
       field_value = $user.id
+      enforce_hidden_fields = false
       data = {account_id: $input.account_id}
     } as $updated_user
   

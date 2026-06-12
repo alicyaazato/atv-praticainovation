@@ -27,12 +27,16 @@ table academic_task {
     // Optional detailed description of the task
     text description? filters=trim
   
-    // Due date for the task
-    date due_date
-  
     // Current status of the task, defaults to pending
-    enum status?=pending {
-      values = ["pending", "in_progress", "completed", "overdue"]
+    enum status?=Pendente {
+      values = ["Pendente", "Em_progresso", "Completa", "Atrasada"]
+    }
+  
+    text data filters=trim
+  
+    // Prioridade da tarefa, default Media
+    enum priority?=Media {
+      values = ["Baixa", "Media", "Alta"]
     }
   }
 
@@ -43,10 +47,10 @@ table academic_task {
     {type: "btree", field: [{name: "user_id", op: "asc"}]}
     {type: "btree", field: [{name: "subject_id", op: "asc"}]}
     {type: "btree", field: [{name: "status", op: "asc"}]}
+    {type: "btree", field: [{name: "priority", op: "asc"}]}
     {
       type : "btree"
       field: [{name: "user_id", op: "asc"}, {name: "status", op: "asc"}]
     }
-    {type: "btree", field: [{name: "due_date", op: "asc"}]}
   ]
 }

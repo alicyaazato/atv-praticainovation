@@ -69,6 +69,7 @@ query "reset/magic-link-login" verb=POST {
     db.edit user {
       field_name = "id"
       field_value = $user.id
+      enforce_hidden_fields = false
       data = {
         password_reset: {
         token     : $user.password_reset.token

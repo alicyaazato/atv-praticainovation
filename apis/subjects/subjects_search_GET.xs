@@ -14,12 +14,12 @@ query "subjects/search" verb=GET {
       error_type = "accessdenied"
       error = "Autenticacao necessaria"
     }
-
+  
     precondition ($input.q != null) {
       error_type = "inputerror"
       error = "Informe o parametro 'q' para buscar por nome"
     }
-
+  
     db.query subject {
       where = $db.subject.user_id == $auth.id && $db.subject.name includes $input.q
       return = {type: "list", paging: {page: 1, per_page: 100}}
@@ -35,6 +35,8 @@ query "subjects/search" verb=GET {
         "items.professor"
         "items.CargaHoraria"
         "items.user_id"
+        "items.status"
+        "items.semester"
       ]
     } as $results
   }

@@ -47,6 +47,7 @@ query "admin/user_role" verb=POST {
     db.edit user {
       field_name = "id"
       field_value = $input.user_id
+      enforce_hidden_fields = false
       data = {role: $input.new_role}
     } as $updated_user
   
