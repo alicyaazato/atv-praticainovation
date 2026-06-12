@@ -22,6 +22,12 @@ Campo novo:
 - priority: string (enum) - "Baixa" | "Média" | "Alta", default "Média"
 ```
 
+**Implementado** com valores internos sem acento (`Baixa` | `Media` | `Alta`,
+default `Media`), seguindo o padrão já usado em `status`
+(`Em_progresso` é a chave interna; "Em progresso" é o rótulo exibido em
+`STATUS_LABELS`). O mapeamento `priority -> rótulo acentuado` (ex.: um futuro
+`PRIORITY_LABELS`) fica para a proposta de front-end.
+
 Campo existente a conciliar:
 
 ```
@@ -77,6 +83,75 @@ Antes de qualquer mudança em `priority` ou em filtros novos:
   e o tratamento em `pages/3_👤_Perfil.py` (via `st.query_params`) já estão
   prontos para esse fluxo — nenhuma mudança adicional necessária do lado do
   front.
+
+## Segurança: endpoint público `edutrackAPI` (academic_task GET)
+
+### `apis/edutrack_api/3914735_academic_task_GET.xs`
+
+Estado atual — sem `auth`, sem filtro, retorna a lista crua de **todos os
+usuários**:
+
+```xanoscript
+// Query all academic_task records
+query academic_task verb=GET {
+  api_group = "edutrackAPI"
+
+  input {
+  }
+
+  stack {
+    db.query academic_task {
+      return = {type: "list"}
+    } as $model
+  }
+
+  response = $model
+}
+```
+
+**Implementado** — alinhado ao padrão já usado em `apis/tasks/tasks_GET.xs`
+(autenticação obrigatória + filtro por `user_id` + resposta em `{items: ...}`,
+incluindo o novo campo `priority`):
+
+```xanoscript
+// Query academic_task records do usuario autenticado
+query academic_task verb=GET {
+  api_group = "edutrackAPI"
+  auth = "user"
+
+  input {
+  }
+
+  stack {
+    precondition ($auth.id) {
+      error_type = "accessdenied"
+      error = "Autenticacao necessaria"
+    }
+
+    db.query academic_task {
+      where = $db.academic_task.user_id == $auth.id
+      return = {type: "list"}
+      output = [
+        "id"
+        "created_at"
+        "user_id"
+        "subject_id"
+        "title"
+        "description"
+        "status"
+        "data"
+        "priority"
+      ]
+    } as $model
+  }
+
+  response = {items: $model}
+}
+```
+
+Como o front-end já cobre essa necessidade via `apis/tasks/tasks_GET.xs`
+(`Tasks` group), este endpoint permanece sem uso direto pelo app — mas deixa
+de expor dados de outros usuários.
 
 ## Integration Points
 

@@ -13,7 +13,7 @@ nada — é o roteiro para a segunda etapa (configuração do ambiente Xano).
 O front-end (Streamlit) já está pronto para consumir as funcionalidades
 abaixo, mas o backend (Xano) ainda não suporta:
 
-- **Status da disciplina** (rascunho / ativo / arquivado): não existe campo
+  - **Status da disciplina** (rascunho / ativo / arquivado): não existe campo
   `status` em `tables/809944_subject.xs`. Sem ele não é possível "arquivar"
   uma disciplina nem filtrar por disciplinas ativas no Dashboard.
 - **Semestre/período da disciplina**: não existe campo `semester`/`periodo`
@@ -35,6 +35,11 @@ abaixo, mas o backend (Xano) ainda não suporta:
   em vez da página **👤 Perfil** do app Streamlit (que já está pronta para
   receber `?magic_token=...&email=...` e concluir o login, implementado em
   `pages/3_👤_Perfil.py`).
+- **Endpoint público sem autenticação**: `apis/edutrack_api/3914735_academic_task_GET.xs`
+  (api_group `edutrackAPI`) não possui `auth = "user"` nem filtro por
+  `user_id` — retorna **todos os registros de `academic_task` de todos os
+  usuários** para qualquer chamador. Esse endpoint não é usado pelo
+  front-end, mas representa um vazamento de dados se permanecer publicado.
 
 ## Solution
 
@@ -54,6 +59,9 @@ abaixo, mas o backend (Xano) ainda não suporta:
    `apis/authentication/3600536_reset_request_reset_link_GET.xs` para que o
    link aponte para a URL pública do app Streamlit (página **Perfil**) com
    os parâmetros `magic_token` e `email`.
+7. Proteger (ou remover) `apis/edutrack_api/3914735_academic_task_GET.xs`:
+   adicionar `auth = "user"` e filtrar `where user_id == $auth.id`, ou
+   excluir o endpoint/grupo `edutrackAPI` caso não seja necessário.
 
 ## Goals
 
@@ -63,6 +71,9 @@ abaixo, mas o backend (Xano) ainda não suporta:
 - Documentar o passo de conciliação do enum `status` de `academic_task`.
 - Especificar a correção da URL no template de e-mail de redefinição de
   senha.
+- Especificar a correção (ou remoção) do endpoint público
+  `apis/edutrack_api/3914735_academic_task_GET.xs`, que hoje expõe dados de
+  todos os usuários sem autenticação.
 
 ## Non-Goals
 
