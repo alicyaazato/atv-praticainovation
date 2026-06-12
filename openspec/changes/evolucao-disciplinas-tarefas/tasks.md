@@ -6,6 +6,13 @@ Tarefas a executar **no Xano**, na segunda etapa do projeto. Nenhuma
 depende de mudanças adicionais no front-end (Streamlit) — o app já está
 preparado para consumir esses campos quando existirem.
 
+**Status**: todas as alterações das Fases 1, 2, 3 e 5 foram aplicadas nos
+arquivos `.xs` locais, pushadas para o Xano (workspace `edutrack-ai`, branch
+`v1`) e validadas com sucesso via smoke test end-to-end contra a API em
+produção. Pendências restantes: Fase 4 (teste manual completo do fluxo de
+magic link por e-mail) e a futura proposta de front-end para consumir
+`subject.status`/`subject.semester`/`academic_task.priority` (ver Summary).
+
 ## Phase 1: Conciliação do enum `status` (academic_task)
 
 ### Task 1.1: Auditar valores de `status` gravados
@@ -20,8 +27,11 @@ preparado para consumir esses campos quando existirem.
   `overdue`).
 
 **Acceptance Criteria**:
-- [ ] Lista de valores distintos de `status` documentada
-- [ ] Decisão registrada: qual conjunto de valores é a fonte da verdade
+- [x] Lista de valores distintos de `status` documentada — pull do Xano já
+      trouxe `tables/842368_academic_task.xs` com
+      `["Pendente", "Em_progresso", "Completa", "Atrasada"]`
+- [x] Decisão registrada: `utils/api_client.STATUS_LABELS` (PT-BR) é a fonte
+      da verdade; tabela já alinhada
 
 ### Task 1.2: Atualizar `tables/842368_academic_task.xs`
 **Priority**: P0 - Bloqueante
@@ -33,9 +43,11 @@ preparado para consumir esses campos quando existirem.
   executar migração de normalização.
 
 **Acceptance Criteria**:
-- [ ] Enum `status` em `tables/842368_academic_task.xs` reflete os dados
-      reais
-- [ ] Nenhum registro com valor de `status` fora do enum
+- [x] Enum `status` em `tables/842368_academic_task.xs` reflete os dados
+      reais — default corrigido de `?=pending` (valor inexistente no enum)
+      para `?=Pendente`
+- [x] Nenhum registro com valor de `status` fora do enum — confirmado via
+      smoke test: task criada sem `status` recebe `"Pendente"`
 
 ---
 
@@ -50,8 +62,10 @@ preparado para consumir esses campos quando existirem.
 - Adicionar `semester` (texto, opcional).
 
 **Acceptance Criteria**:
-- [ ] Campos criados na tabela com os tipos/defaults corretos
-- [ ] Registros existentes recebem `status = "ativo"` por padrão
+- [x] Campos criados na tabela com os tipos/defaults corretos
+- [x] Registros existentes recebem `status = "ativo"` por padrão —
+      confirmado via smoke test: subject criado sem `status`/`semester`
+      recebe `status: "ativo"`, `semester: ""`
 
 ### Task 2.2: Atualizar `apis/subjects/subjects_POST.xs`
 **Priority**: P1 - Alta
@@ -61,8 +75,8 @@ preparado para consumir esses campos quando existirem.
 - Validar `status` contra o enum.
 
 **Acceptance Criteria**:
-- [ ] POST aceita os novos campos
-- [ ] POST sem os novos campos continua funcionando (defaults aplicados)
+- [x] POST aceita os novos campos
+- [x] POST sem os novos campos continua funcionando (defaults aplicados)
 
 ### Task 2.3: Criar/atualizar endpoint de update parcial de subject
 **Priority**: P1 - Alta
@@ -73,8 +87,11 @@ preparado para consumir esses campos quando existirem.
   edição de período pela UI).
 
 **Acceptance Criteria**:
-- [ ] PATCH aceita `status` e `semester` isoladamente
-- [ ] Transição para `arquivado` funciona
+- [x] PATCH aceita `status` e `semester` isoladamente
+- [x] Transição para `arquivado` funciona
+- [x] `apis/subjects/subjects_search_GET.xs`: output inclui
+      `items.status`/`items.semester` — confirmado via smoke test após
+      re-push
 
 ---
 
@@ -85,21 +102,37 @@ preparado para consumir esses campos quando existirem.
 **Dependencies**: Phase 1 concluída
 
 - Adicionar `priority` (enum: `Baixa` | `Média` | `Alta`, default `Média`).
+- **Decisão de implementação**: valores internos do enum sem acento
+  (`Baixa`, `Media`, `Alta`, default `Media`), seguindo o mesmo padrão de
+  `Em_progresso` em `STATUS_LABELS` (chave interna ASCII, rótulo acentuado
+  fica para a futura proposta de front-end).
 
 **Acceptance Criteria**:
-- [ ] Campo criado com tipo/default corretos
-- [ ] Registros existentes recebem `priority = "Média"` por padrão
+- [x] Campo criado com tipo/default corretos
+- [x] Registros existentes recebem `priority = "Media"` por padrão —
+      confirmado via smoke test: task criada sem `priority` recebe
+      `priority: "Media"`
 
 ### Task 3.2: Atualizar `apis/tasks/tasks_POST.xs` e update parcial
 **Priority**: P1 - Alta
 **Dependencies**: Task 3.1
 
-- Aceitar `priority` (default `"Média"`) no POST.
+- Aceitar `priority` (default `"Media"`) no POST.
 - Aceitar `priority` como campo parcial no PATCH de update de tarefa.
 
 **Acceptance Criteria**:
-- [ ] POST e PATCH aceitam `priority`
-- [ ] Requisições sem `priority` continuam funcionando (default aplicado)
+- [x] POST e PATCH aceitam `priority`
+- [x] Requisições sem `priority` continuam funcionando (default aplicado)
+- [x] `apis/tasks/tasks_GET.xs`: output inclui `"priority"` — confirmado via
+      smoke test após re-push
+
+**Nota**: ao editar `apis/tasks/tasks_id_PATCH.xs` foi corrigido um bug
+pré-existente — o `db.edit academic_task` gravava `$input.*` em vez dos
+`$final_*` resolvidos, então um PATCH parcial (ex.: só `status`) apagava
+`title`/`description`/`subject_id`. Agora usa os `$final_*`. **Confirmado via
+smoke test**: PATCH parcial (`{"status": "Completa"}` e depois
+`{"priority": "Baixa"}`) preserva `title`, `description`, `subject_id`,
+`data` e `priority`/`status` corretamente.
 
 ---
 
@@ -114,17 +147,43 @@ preparado para consumir esses campos quando existirem.
   publicado, com `magic_token` e `email` na query string.
 
 **Acceptance Criteria**:
-- [ ] E-mail de redefinição contém link para o app Streamlit
+- [x] E-mail de redefinição contém link para o app Streamlit (URL atual:
+      `http://179.110.58.64:8765`, ajustar se o app mudar de endereço)
 - [ ] Fluxo completo testado: solicitar reset → clicar no link → app loga
       o usuário e exibe o formulário de nova senha (já implementado em
       `pages/3_👤_Perfil.py`)
 
 ---
 
+## Phase 5: Segurança — endpoint público `edutrackAPI`
+
+### Task 5.1: Proteger ou remover `apis/edutrack_api/3914735_academic_task_GET.xs`
+**Priority**: P0 - Bloqueante (segurança)
+**Dependencies**: Nenhuma
+
+- O endpoint `GET academic_task` do grupo `edutrackAPI` (canonical
+  `-KghbQCu`) não possui `auth = "user"` nem filtro por `user_id` e retorna
+  os registros de `academic_task` de **todos os usuários**.
+- Esse endpoint não é consumido pelo front-end (`utils/api_client.py`) — a
+  listagem de tarefas já é feita por `apis/tasks/tasks_GET.xs` (group
+  `Tasks`), que já filtra por `$auth.id`.
+- Opção escolhida: **protegido** com `auth = "user"`,
+  `precondition ($auth.id)` e `where = $db.academic_task.user_id == $auth.id`,
+  resposta envolvida em `{items: $model}` (mantém o endpoint disponível,
+  mas seguro — ver XanoScript em `design.md`).
+
+**Acceptance Criteria**:
+- [x] Endpoint `edutrackAPI/academic_task` protegido com `auth = "user"` +
+      filtro por `user_id`
+- [x] Nenhuma chamada não autenticada retorna dados de outros usuários
+
+---
+
 ## Summary
 
-**Ordem recomendada**: Phase 1 → Phase 2 e Phase 3 (podem ser paralelas) →
-Phase 4 (independente, pode ser feita em qualquer momento).
+**Ordem recomendada**: Phase 1 e Phase 5 (bloqueantes, podem ser feitas em
+paralelo) → Phase 2 e Phase 3 (podem ser paralelas) → Phase 4 (independente,
+pode ser feita em qualquer momento).
 
 **Após conclusão**, abrir uma nova proposta de front-end para consumir
 `subject.status`/`subject.semester` (Dashboard, Disciplinas) e
