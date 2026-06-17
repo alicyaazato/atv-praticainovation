@@ -128,16 +128,20 @@ query "reset/request-reset-link" verb=POST {
         """
     } as $message
   
-    // Envia o e-mail usando o provedor configurado (Resend é recomendado para produção)
-    // Nota: É necessário configurar a variável de ambiente RESEND_API_KEY no Xano.
-    // Altere 'from' para o seu e-mail verificado no Resend.
+    // Envia o e-mail via Gmail SMTP.
+    // Variáveis de ambiente necessárias no Xano:
+    //   GMAIL_USER         → seu endereço Gmail (ex: seuemail@gmail.com)
+    //   GMAIL_APP_PASSWORD → App Password de 16 dígitos gerado em myaccount.google.com/apppasswords
     util.send_email {
-      api_key = $env.RESEND_API_KEY_
-      service_provider = "resend"
-      subject = "Recuperação de senha"
+      service_provider = "smtp"
+      host = "smtp.gmail.com"
+      port = 587
+      username = $env.GMAIL_USER
+      password = $env.GMAIL_APP_PASSWORD
+      subject = "Recuperação de senha — EduTrack AI"
       message = $message
       to = $token_and_email.email
-      from = "alicya.azato@aluno.impacta.edu.br"
+      from = $env.GMAIL_USER
     } as $send_email
   }
 

@@ -15,8 +15,7 @@
       "Bash(git ls-remote *)",
       "Bash(git push *)",
       "Bash(git pull *)",
-      "Bash(git stash *)",
-      "Bash(git rebase *)"
+      "Bash(git stash *)"
     ]
   }
 }
