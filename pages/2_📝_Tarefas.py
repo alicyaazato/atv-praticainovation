@@ -72,6 +72,7 @@ with tab_nova:
                     "data": to_xano_due(prazo),
                     "subject_id": disciplina_id,
                     "priority": prioridade,
+                    "status": "Atrasada" if prazo < date.today() else "Pendente",
                 }
                 _, err = create_task(payload)
                 if err:
@@ -137,7 +138,7 @@ with tab_lista:
                 venc = is_overdue(t)
                 status_lbl = STATUS_LABELS.get(t.get("status"), t.get("status"))
                 icone_prioridade = PRIORITY_ICONS.get(t.get("priority", "Media"), "")
-                titulo_exib = f"{icone_prioridade} {'🔴 ' if venc else ''}{t.get('title', '—')} · {status_lbl}"
+                titulo_exib = f"{icone_prioridade} {'❗ ' if venc else ''}{t.get('title', '—')} · {status_lbl}"
 
                 with st.expander(titulo_exib):
                     if venc:

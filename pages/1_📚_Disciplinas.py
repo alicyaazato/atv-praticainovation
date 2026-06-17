@@ -89,9 +89,9 @@ with tab_lista:
                         new_prof = st.text_input("Professor", value=subj.get("professor") or "", key=f"prof_{subj_id}")
                         new_ch = st.number_input(
                             "Carga Horária (h)",
-                            min_value=0.0,
-                            step=0.5,
-                            value=float(subj.get("CargaHoraria") or 0),
+                            min_value=0,
+                            step=1,
+                            value=int(subj.get("CargaHoraria") or 0),
                             key=f"ch_{subj_id}",
                         )
                         new_status = st.selectbox(
@@ -117,7 +117,7 @@ with tab_lista:
                             patch_payload["name"] = new_name
                         if new_prof != (subj.get("professor") or ""):
                             patch_payload["professor"] = new_prof
-                        if new_ch != float(subj.get("CargaHoraria") or 0):
+                        if new_ch != int(subj.get("CargaHoraria") or 0):
                             patch_payload["carga_horaria"] = new_ch
                         if new_status != status_atual:
                             patch_payload["status"] = new_status
@@ -207,7 +207,7 @@ with tab_nova:
     with st.form("form_nova_disciplina"):
         nome = st.text_input("Nome da Disciplina *", placeholder="Ex: Cálculo I")
         professor = st.text_input("Professor *", placeholder="Ex: Prof. João Silva")
-        carga_horaria = st.number_input("Carga Horária (h) *", min_value=0.0, step=0.5, value=0.0)
+        carga_horaria = st.number_input("Carga Horária (h) *", min_value=0, step=1, value=0)
         col_status, col_sem = st.columns(2)
         with col_status:
             status_novo = st.selectbox(
@@ -228,16 +228,30 @@ with tab_nova:
         elif carga_horaria <= 0:
             st.error("A carga horária deve ser maior que zero.")
         else:
-            payload = {
-                "name": nome.strip(),
-                "professor": professor.strip(),
-                "carga_horaria": carga_horaria,
-                "status": status_novo,
-                "semester": semestre_novo.strip(),
-            }
-            _, err = create_subject(payload)
-            if err:
-                st.error(f"Erro ao cadastrar: {err}")
+            existing = st.session_state.get("subjects_cache", [])
+            nome_n = nome.strip().lower()
+            prof_n = professor.strip().lower()
+            duplicata = any(
+                s.get("name", "").strip().lower() == nome_n
+                and s.get("professor", "").strip().lower() == prof_n
+                for s in existing
+            )
+            if duplicata:
+                st.warning(
+                    f"Já existe uma disciplina **{nome.strip()}** com o professor **{professor.strip()}**. "
+                    "Verifique sua lista de disciplinas."
+                )
             else:
-                st.success(f"Disciplina **{nome}** cadastrada com sucesso!")
-                st.session_state.pop("subjects_cache", None)
+                payload = {
+                    "name": nome.strip(),
+                    "professor": professor.strip(),
+                    "carga_horaria": carga_horaria,
+                    "status": status_novo,
+                    "semester": semestre_novo.strip(),
+                }
+                _, err = create_subject(payload)
+                if err:
+                    st.error(f"Erro ao cadastrar: {err}")
+                else:
+                    st.success(f"Disciplina **{nome}** cadastrada com sucesso!")
+                    st.session_state.pop("subjects_cache", None)
