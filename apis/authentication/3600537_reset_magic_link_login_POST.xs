@@ -35,16 +35,15 @@ query "reset/magic-link-login" verb=POST {
       ]
     } as $user
   
-    // Validate the UUID matches the hashed value
-    security.check_password {
-      text_password = $input.magic_token
-      hash_password = $user.password_reset.token
-    } as $verify_token
+    // Valida se o token fornecido coincide com o salvo no banco (comparação direta de texto)
+    var $verify_token {
+      value = $input.magic_token == $user.password_reset.token
+    }
   
-    // Verify the UUID validation is true
+    // Verifica se a validação do token é verdadeira
     precondition ($verify_token) {
       error_type = "unauthorized"
-      error = "The token did not match"
+      error = "O token não coincide."
     }
   
     // Check that the password reset token has not expired
