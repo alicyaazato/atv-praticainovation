@@ -72,6 +72,7 @@ with tab_nova:
                     "data": to_xano_due(prazo),
                     "subject_id": disciplina_id,
                     "priority": prioridade,
+                    "status": "Atrasada" if prazo < date.today() else "Pendente",
                 }
                 _, err = create_task(payload)
                 if err:
