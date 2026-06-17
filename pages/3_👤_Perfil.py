@@ -15,8 +15,6 @@ from utils.api_client import (
 
 # ── Page ──────────────────────────────────────────────────────────────────────
 
-st.title("👤 Perfil")
-
 # ── Login via magic link (redefinição de senha) ────────────────────────────────
 
 qp = st.query_params
@@ -33,6 +31,8 @@ if not is_authenticated() and "magic_token" in qp and "email" in qp:
 # ── Autenticado ───────────────────────────────────────────────────────────────
 
 if is_authenticated():
+    st.title("👤 Perfil")
+
     dados, err = get_profile()
 
     if err:
@@ -129,64 +129,80 @@ if is_authenticated():
 # ── Não autenticado: login / registro ─────────────────────────────────────────
 
 else:
-    st.caption("Bem-vindo ao EduTrack AI! Faça login ou crie uma conta para começar.")
-    tab_login, tab_registro = st.tabs(["🔑 Login", "📝 Criar conta"])
+    st.markdown("""
+    <style>
+    .edu-hero { text-align: center; padding: 2.5rem 0 1.5rem; }
+    .edu-hero h1 { color: #4F46E5; font-size: 2rem; font-weight: 700; margin: 0.4rem 0 0.2rem; }
+    .edu-hero p  { color: #6B7280; font-size: .9rem; margin: 0; }
+    </style>
+    """, unsafe_allow_html=True)
 
-    with tab_login:
-        st.subheader("Entrar na sua conta")
+    _, mid, _ = st.columns([1, 2, 1])
 
-        with st.form("form_login"):
-            email_login = st.text_input("E-mail", placeholder="seu@email.com")
-            senha_login = st.text_input("Senha", type="password", placeholder="••••••••")
-            entrar = st.form_submit_button("Entrar", use_container_width=True)
+    with mid:
+        st.markdown("""
+        <div class="edu-hero">
+            <div style="font-size:3.5rem;line-height:1.2">🎓</div>
+            <h1>EduTrack AI</h1>
+            <p>Organize seus estudos com inteligência</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-        if entrar:
-            if not email_login or not senha_login:
-                st.warning("Preencha e-mail e senha.")
-            else:
-                token, err = login(email_login, senha_login)
-                if err:
-                    st.error(err)
+        tab_login, tab_registro = st.tabs(["🔑 Entrar", "📝 Criar conta"])
+
+        with tab_login:
+            st.markdown("#### Bem-vindo de volta!")
+            with st.form("form_login"):
+                email_login = st.text_input("E-mail", placeholder="seu@email.com")
+                senha_login = st.text_input("Senha", type="password", placeholder="••••••••")
+                entrar = st.form_submit_button("Entrar →", use_container_width=True, type="primary")
+
+            if entrar:
+                if not email_login or not senha_login:
+                    st.warning("Preencha e-mail e senha.")
                 else:
-                    set_token(token)
-                    st.success("Login realizado com sucesso!")
-                    st.rerun()
-
-        with st.expander("Esqueci minha senha"):
-            with st.form("form_esqueci_senha"):
-                email_reset = st.text_input("E-mail cadastrado", placeholder="seu@email.com", key="email_reset")
-                enviar_reset = st.form_submit_button("Enviar link de redefinição", use_container_width=True)
-
-            if enviar_reset:
-                if not email_reset:
-                    st.warning("Informe seu e-mail.")
-                else:
-                    _, err = request_password_reset(email_reset.strip())
+                    token, err = login(email_login, senha_login)
                     if err:
                         st.error(err)
                     else:
-                        st.success("Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.")
+                        set_token(token)
+                        st.success("Login realizado com sucesso!")
+                        st.switch_page("app.py")
 
-    with tab_registro:
-        st.subheader("Criar nova conta")
+            with st.expander("Esqueci minha senha"):
+                with st.form("form_esqueci_senha"):
+                    email_reset = st.text_input("E-mail cadastrado", placeholder="seu@email.com", key="email_reset")
+                    enviar_reset = st.form_submit_button("Enviar link de redefinição", use_container_width=True)
 
-        with st.form("form_registro"):
-            nome_reg = st.text_input("Nome completo", placeholder="João Silva")
-            email_reg = st.text_input("E-mail", placeholder="seu@email.com")
-            senha_reg = st.text_input("Senha", type="password", placeholder="••••••••")
-            senha_conf = st.text_input("Confirmar senha", type="password", placeholder="••••••••")
-            cadastrar = st.form_submit_button("Criar conta", use_container_width=True)
+                if enviar_reset:
+                    if not email_reset:
+                        st.warning("Informe seu e-mail.")
+                    else:
+                        _, err = request_password_reset(email_reset.strip())
+                        if err:
+                            st.error(err)
+                        else:
+                            st.success("Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.")
 
-        if cadastrar:
-            if not nome_reg or not email_reg or not senha_reg:
-                st.warning("Preencha todos os campos obrigatórios.")
-            elif senha_reg != senha_conf:
-                st.error("As senhas não coincidem.")
-            else:
-                token, err = signup(nome_reg, email_reg, senha_reg)
-                if err:
-                    st.error(err)
+        with tab_registro:
+            st.markdown("#### Crie sua conta gratuita")
+            with st.form("form_registro"):
+                nome_reg = st.text_input("Nome completo", placeholder="João Silva")
+                email_reg = st.text_input("E-mail", placeholder="seu@email.com")
+                senha_reg = st.text_input("Senha", type="password", placeholder="••••••••")
+                senha_conf = st.text_input("Confirmar senha", type="password", placeholder="••••••••")
+                cadastrar = st.form_submit_button("Criar conta →", use_container_width=True, type="primary")
+
+            if cadastrar:
+                if not nome_reg or not email_reg or not senha_reg:
+                    st.warning("Preencha todos os campos obrigatórios.")
+                elif senha_reg != senha_conf:
+                    st.error("As senhas não coincidem.")
                 else:
-                    set_token(token)
-                    st.success("Usuário cadastrado com sucesso!")
-                    st.rerun()
+                    token, err = signup(nome_reg, email_reg, senha_reg)
+                    if err:
+                        st.error(err)
+                    else:
+                        set_token(token)
+                        st.success("Usuário cadastrado com sucesso!")
+                        st.switch_page("app.py")
