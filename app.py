@@ -1,5 +1,6 @@
 import streamlit as st
 
+from utils.ui import inject_global_styles
 from utils.api_client import (
     PRIORITY_ICONS,
     PRIORITY_LABELS,
@@ -14,6 +15,7 @@ from utils.api_client import (
 )
 
 st.set_page_config(page_title="EduTrack AI", page_icon="🎓", layout="wide")
+inject_global_styles()
 
 
 def dashboard_page():
