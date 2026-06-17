@@ -93,8 +93,8 @@ if is_authenticated():
 
         st.divider()
 
-    # ── Tabs: editar perfil / alterar senha ───────────────────────────────────
-    tab_perfil, tab_senha = st.tabs(["✏️ Editar Perfil", "🔒 Alterar Senha"])
+    # ── Tabs: editar perfil / segurança ───────────────────────────────────────
+    tab_perfil, tab_seguranca = st.tabs(["✏️ Editar Perfil", "🔒 Segurança"])
 
     with tab_perfil:
         st.markdown("#### Informações da conta")
@@ -115,28 +115,20 @@ if is_authenticated():
                     st.success("Perfil atualizado com sucesso!")
                     st.rerun()
 
-    with tab_senha:
-        st.markdown("#### Redefinir senha")
-        st.caption("Você já está autenticado — informe a nova senha diretamente.")
+    with tab_seguranca:
+        st.markdown("#### Redefinição de senha")
+        st.info(
+            "Por segurança, a senha é redefinida exclusivamente via e-mail. "
+            "Clique no botão abaixo para receber o link de redefinição no seu e-mail cadastrado."
+        )
+        st.write(f"**E-mail cadastrado:** {dados.get('email', '—')}")
 
-        with st.form("form_alterar_senha"):
-            nova_senha = st.text_input("Nova senha", type="password", placeholder="Mínimo 8 caracteres")
-            conf_senha = st.text_input("Confirmar nova senha", type="password", placeholder="••••••••")
-            alterar = st.form_submit_button("🔒 Alterar senha", use_container_width=True, type="primary")
-
-        if alterar:
-            if not nova_senha or not conf_senha:
-                st.warning("Preencha os dois campos de senha.")
-            elif len(nova_senha) < 8:
-                st.error("A senha deve ter no mínimo 8 caracteres.")
-            elif nova_senha != conf_senha:
-                st.error("As senhas não coincidem.")
+        if st.button("📧 Enviar link de redefinição", type="primary", use_container_width=False):
+            _, err = request_password_reset(dados.get("email", ""))
+            if err:
+                st.error(f"Erro ao enviar: {err}")
             else:
-                _, err = change_password(nova_senha, conf_senha)
-                if err:
-                    st.error(err)
-                else:
-                    st.success("Senha alterada com sucesso!")
+                st.success("Link de redefinição enviado! Verifique sua caixa de entrada.")
 
     # ── Sair ──────────────────────────────────────────────────────────────────
     st.divider()
@@ -187,7 +179,7 @@ else:
                     else:
                         set_token(token)
                         st.success("Login realizado com sucesso!")
-                        st.switch_page("app.py")
+                        st.rerun()
 
             with st.expander("Esqueci minha senha"):
                 with st.form("form_esqueci_senha"):
@@ -225,4 +217,4 @@ else:
                     else:
                         set_token(token)
                         st.success("Usuário cadastrado com sucesso!")
-                        st.switch_page("app.py")
+                        st.rerun()
