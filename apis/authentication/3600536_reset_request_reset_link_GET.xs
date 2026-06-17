@@ -20,7 +20,7 @@ query "reset/request-reset-link" verb=POST {
   
     // URL base do aplicativo (EduTrack AI)
     var $app_base_url {
-      value = "https://atv-praticainovation-kdmdubdbe3nrdurbbasjiu.streamlit.app"
+      value = $env.FRONTEND_URL
     }
   
     // Cria o link mágico para o reset
@@ -128,20 +128,17 @@ query "reset/request-reset-link" verb=POST {
         """
     } as $message
   
-    // Envia o e-mail via Gmail SMTP.
+    // Envia o e-mail via Resend (plano gratuito: 3.000/mês, 100/dia).
     // Variáveis de ambiente necessárias no Xano:
-    //   GMAIL_USER         → seu endereço Gmail (ex: seuemail@gmail.com)
-    //   GMAIL_APP_PASSWORD → App Password de 16 dígitos gerado em myaccount.google.com/apppasswords
+    //   RESEND_API_KEY → chave gerada em resend.com/api-keys
+    //   FRONTEND_URL   → https://atv-praticainovation-kdmdubdbe3nrdurbbasjiu.streamlit.app
     util.send_email {
-      service_provider = "smtp"
-      host = "smtp.gmail.com"
-      port = 587
-      username = $env.GMAIL_USER
-      password = $env.GMAIL_APP_PASSWORD
+      service_provider = "resend"
+      api_key = $env.RESEND_API_KEY
       subject = "Recuperação de senha — EduTrack AI"
       message = $message
       to = $token_and_email.email
-      from = $env.GMAIL_USER
+      from = "onboarding@resend.dev"
     } as $send_email
   }
 
