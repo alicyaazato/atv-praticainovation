@@ -299,12 +299,15 @@ def request_password_reset(email: str):
 
 def magic_link_login(magic_token: str, email: str):
     """Troca o magic token (vindo do link do e-mail) por um auth token."""
-    return request(
+    data, err = request(
         "POST",
         f"{AUTH_URL}/reset/magic-link-login",
         auth=False,
         json={"magic_token": magic_token, "email": email},
     )
+    if err:
+        return None, err
+    return data.get("authToken"), None
 
 
 # ── UI: confirmação de exclusão ──────────────────────────────────────────────

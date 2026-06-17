@@ -25,7 +25,7 @@ if not is_authenticated() and "magic_token" in qp and "email" in qp:
         set_token(token)
         st.session_state["force_password_tab"] = True
         st.query_params.clear()
-        st.rerun()
+        st.switch_page("pages/3_👤_Perfil.py")
 
 # ── Autenticado ───────────────────────────────────────────────────────────────
 
