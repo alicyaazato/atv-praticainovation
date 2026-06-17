@@ -179,7 +179,7 @@ else:
                     else:
                         set_token(token)
                         st.success("Login realizado com sucesso!")
-                        st.switch_page("app.py")
+                        st.rerun()
 
             with st.expander("Esqueci minha senha"):
                 with st.form("form_esqueci_senha"):
@@ -217,4 +217,4 @@ else:
                     else:
                         set_token(token)
                         st.success("Usuário cadastrado com sucesso!")
-                        st.switch_page("app.py")
+                        st.rerun()
