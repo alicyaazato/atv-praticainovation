@@ -15,10 +15,10 @@ TASKS_URL = "https://x8ki-letl-twmt.n7.xano.io/api:FJtu6_X0"
 
 # status interno (vindo da API) -> rótulo exibido
 STATUS_LABELS = {
-    "Pendente": "Pendente",
-    "Em_progresso": "Em progresso",
-    "Completa": "Completa",
-    "Atrasada": "Atrasada",
+    "Pendente": "⏳ Pendente",
+    "Em_progresso": "🔄 Em progresso",
+    "Completa": "✅ Completa",
+    "Atrasada": "⚠️ Atrasada",
 }
 STATUS_OPTIONS = list(STATUS_LABELS.keys())
 
@@ -39,7 +39,7 @@ PRIORITY_LABELS = {
 PRIORITY_OPTIONS = list(PRIORITY_LABELS.keys())
 
 # ícone e peso (para exibição e ordenação) por prioridade
-PRIORITY_ICONS = {"Baixa": "🟢", "Media": "🟡", "Alta": "🔴"}
+PRIORITY_ICONS = {"Baixa": "⬇️", "Media": "➡️", "Alta": "⬆️"}
 PRIORITY_WEIGHT = {"Baixa": 0, "Media": 1, "Alta": 2}
 
 
