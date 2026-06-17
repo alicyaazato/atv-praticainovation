@@ -12,7 +12,11 @@
       "Bash(git status *)",
       "Bash(gh pr *)",
       "PowerShell(gh pr *)",
-      "Bash(git ls-remote *)"
+      "Bash(git ls-remote *)",
+      "Bash(git push *)",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "Bash(git rebase *)"
     ]
   }
 }

@@ -123,7 +123,7 @@ if is_authenticated():
         )
         st.write(f"**E-mail cadastrado:** {dados.get('email', '—')}")
 
-        if st.button("📧 Enviar link de redefinição", type="primary", use_container_width=False):
+        if st.button("📧 Enviar link de redefinição", type="primary"):
             _, err = request_password_reset(dados.get("email", ""))
             if err:
                 st.error(f"Erro ao enviar: {err}")

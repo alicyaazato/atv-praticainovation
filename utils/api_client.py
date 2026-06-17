@@ -294,7 +294,7 @@ def change_password(new_password: str, confirm_password: str):
 
 def request_password_reset(email: str):
     """Solicita o e-mail com o magic link de redefinição de senha (sem autenticação)."""
-    return request("GET", f"{AUTH_URL}/reset/request-reset-link", auth=False, params={"email": email})
+    return request("POST", f"{AUTH_URL}/reset/request-reset-link", auth=False, json={"email": email})
 
 
 def magic_link_login(magic_token: str, email: str):
