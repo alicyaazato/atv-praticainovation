@@ -122,7 +122,7 @@ query "reset/request-reset-link" verb=POST {
     // Variável de ambiente necessária no Xano:
     //   RESEND_API_KEY → chave gerada em resend.com/api-keys
     util.send_email {
-      api_key = $env.RESEND_API_KEY
+      api_key = $env.RESEND_API_KEY_
       service_provider = "resend"
       subject = "Seu código de redefinição de senha — EduTrack AI"
       message = $message
@@ -134,7 +134,6 @@ query "reset/request-reset-link" verb=POST {
   response = {
     success: true
     message: "Código de redefinição enviado com sucesso."
-    debug_send_email: $send_email
   }
 
   tags = ["xano:quick-start"]
