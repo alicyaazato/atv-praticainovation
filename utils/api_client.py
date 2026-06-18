@@ -106,7 +106,7 @@ def request(method: str, url: str, auth: bool = True, **kwargs):
     except requests.exceptions.RequestException as e:
         return None, f"Erro de conexão: {e}"
 
-    if resp.status_code == 401:
+    if auth and resp.status_code == 401:
         clear_token()
         st.session_state["session_expired"] = True
         return None, "Sessão expirada"
