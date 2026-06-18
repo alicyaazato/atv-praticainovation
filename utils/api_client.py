@@ -297,17 +297,20 @@ def request_password_reset(email: str):
     return request("POST", f"{AUTH_URL}/reset/request-reset-link", auth=False, json={"email": email})
 
 
-def verify_reset_code(email: str, code: str):
-    """Confirma o código de redefinição recebido por e-mail e troca por um auth token."""
-    data, err = request(
+def confirm_password_reset(email: str, code: str, password: str, confirm_password: str):
+    """Confirma o código de redefinição recebido por e-mail e já grava a nova senha.
+    Não exige autenticação: o código enviado por e-mail é a prova de identidade."""
+    return request(
         "POST",
-        f"{AUTH_URL}/reset/verify-code",
+        f"{AUTH_URL}/reset/confirm-code",
         auth=False,
-        json={"email": email, "code": code},
+        json={
+            "email": email,
+            "code": code,
+            "password": password,
+            "confirm_password": confirm_password,
+        },
     )
-    if err:
-        return None, err
-    return data.get("authToken"), None
 
 
 # ── UI: confirmação de exclusão ──────────────────────────────────────────────

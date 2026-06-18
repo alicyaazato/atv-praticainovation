@@ -1,8 +1,8 @@
 import streamlit as st
 
 from utils.api_client import (
-    change_password,
     clear_token,
+    confirm_password_reset,
     edit_profile,
     get_profile,
     is_authenticated,
@@ -10,7 +10,6 @@ from utils.api_client import (
     request_password_reset,
     set_token,
     signup,
-    verify_reset_code,
 )
 from utils.ui import inject_global_styles
 
@@ -71,13 +70,15 @@ def render_password_reset_flow(key_prefix: str, known_email: str | None = None):
             )
         with col_reenviar:
             reenviar = st.form_submit_button(
-                "↩️ Trocar e-mail / reenviar", use_container_width=True
+                "🔁 Reenviar código", use_container_width=True
             )
 
     if reenviar:
-        st.session_state.pop(step_key, None)
-        st.session_state.pop(email_key, None)
-        st.rerun()
+        _, err = request_password_reset(email_alvo)
+        if err:
+            st.error(err)
+        else:
+            st.success(f"Novo código enviado para {email_alvo}.")
 
     if confirmar:
         if not codigo or not nova_senha or not conf_senha:
@@ -87,19 +88,14 @@ def render_password_reset_flow(key_prefix: str, known_email: str | None = None):
         elif nova_senha != conf_senha:
             st.error("As senhas não coincidem.")
         else:
-            token, err = verify_reset_code(email_alvo, codigo.strip())
+            _, err = confirm_password_reset(email_alvo, codigo.strip(), nova_senha, conf_senha)
             if err:
                 st.error(err)
             else:
-                set_token(token)
-                _, err2 = change_password(nova_senha, conf_senha)
-                if err2:
-                    st.error(err2)
-                else:
-                    st.session_state.pop(step_key, None)
-                    st.session_state.pop(email_key, None)
-                    st.success("Senha alterada com sucesso!")
-                    st.rerun()
+                st.session_state.pop(step_key, None)
+                st.session_state.pop(email_key, None)
+                st.success("Senha alterada com sucesso!")
+                st.rerun()
 
 
 # ── Autenticado ───────────────────────────────────────────────────────────────
