@@ -88,7 +88,7 @@ atv-praticainovation/
 - Gestão de tarefas com prioridade, prazo e status automático
 - Dashboard com métricas, progresso e próximas tarefas
 - Relatórios com histórico por período e exportação em CSV
-- Redefinição de senha por e-mail (magic link)
+- Redefinição de senha por código de verificação enviado por e-mail
 
 ---
 
