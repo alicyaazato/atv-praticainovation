@@ -12,12 +12,12 @@ query "reset/verify-code" verb=POST {
     precondition ($input.code != null) {
       error = "code is required but was not provided."
     }
-
+  
     // Check to make sure the email exists
     precondition ($input.email != null) {
       error = "email is required but not provided"
     }
-
+  
     // Get the user record with the email informado
     db.get user {
       field_name = "email"
@@ -34,28 +34,28 @@ query "reset/verify-code" verb=POST {
         "password_reset.used"
       ]
     } as $user
-
+  
     // Valida se o código fornecido coincide com o salvo no banco (comparação direta de texto)
     var $verify_token {
       value = $input.code == $user.password_reset.token
     }
-
+  
     // Verifica se a validação do código é verdadeira
     precondition ($verify_token) {
       error_type = "unauthorized"
       error = "O código informado está incorreto."
     }
-
+  
     // Check that the password reset code has not expired
     precondition ($user.password_reset.expiration > now) {
       error = "Este código expirou. Solicite um novo."
     }
-
+  
     // Check to make sure the password reset code has not been used
     precondition ($user.password_reset.used == false) {
       error = "Este código já foi utilizado. Solicite um novo."
     }
-
+  
     // Create an authentication token
     security.create_auth_token {
       table = "user"
