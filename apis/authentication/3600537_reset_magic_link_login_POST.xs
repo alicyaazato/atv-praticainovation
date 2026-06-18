@@ -59,7 +59,7 @@ query "reset/verify-code" verb=POST {
     // Create an authentication token
     security.create_auth_token {
       table = "user"
-      extras = ""
+      extras = {}
       expiration = 86400
       id = $user.id
     } as $auth_token
