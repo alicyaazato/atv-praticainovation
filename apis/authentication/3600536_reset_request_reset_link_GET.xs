@@ -134,6 +134,7 @@ query "reset/request-reset-link" verb=POST {
   response = {
     success: true
     message: "Código de redefinição enviado com sucesso."
+    debug_send_email: $send_email
   }
 
   tags = ["xano:quick-start"]
