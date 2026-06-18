@@ -136,22 +136,22 @@ smoke test**: PATCH parcial (`{"status": "Completa"}` e depois
 
 ---
 
-## Phase 4: Magic link de redefinição de senha
+## Phase 4: Redefinição de senha (superado — código de verificação)
 
-### Task 4.1: Corrigir URL no template de e-mail
+### Task 4.1: ~~Corrigir URL no template de e-mail~~ — substituído
 **Priority**: P2 - Média
 **Dependencies**: Nenhuma
 
-- Atualizar `apis/authentication/3600536_reset_request_reset_link_GET.xs`
-  para montar o link apontando para a página **Perfil** do app Streamlit
-  publicado, com `magic_token` e `email` na query string.
+- Abordagem original (link mágico clicável) foi descartada em favor de um
+  código de verificação de 6 dígitos, evitando o redirecionamento entre
+  e-mail e app. Ver `apis/authentication/3600536_reset_request_reset_link_GET.xs`,
+  `apis/authentication/3600537_reset_magic_link_login_POST.xs`
+  (`reset/verify-code`) e o fluxo em `pages/3_👤_Perfil.py`.
 
 **Acceptance Criteria**:
-- [x] E-mail de redefinição contém link para o app Streamlit (URL atual:
-      `http://179.110.58.64:8765`, ajustar se o app mudar de endereço)
-- [ ] Fluxo completo testado: solicitar reset → clicar no link → app loga
-      o usuário e exibe o formulário de nova senha (já implementado em
-      `pages/3_👤_Perfil.py`)
+- [x] E-mail de redefinição contém o código de 6 dígitos (válido por 15 min)
+- [x] Fluxo completo testado: solicitar código → digitar código + nova senha
+      no app → senha atualizada e usuário autenticado
 
 ---
 

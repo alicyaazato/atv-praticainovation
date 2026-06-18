@@ -71,18 +71,16 @@ Antes de qualquer mudança em `priority` ou em filtros novos:
 ### `apis/tasks/tasks_id_PATCH.xs` (ou equivalente de update)
 - Aceitar `priority` como campo parcial.
 
-## Magic link de redefinição de senha
+## Redefinição de senha
 
-### `apis/authentication/3600536_reset_request_reset_link_GET.xs`
-- O template de e-mail atualmente monta um link para uma página de demo do
-  Xano.
-- Trocar a URL base para a URL pública do app Streamlit (página
-  **👤 Perfil**), preservando os parâmetros `magic_token` e `email` na
-  query string — ex.: `https://<app-streamlit>/Perfil?magic_token={{magic_token}}&email={{email}}`.
-- O endpoint `apis/authentication/3600537_reset_magic_link_login_POST.xs`
-  e o tratamento em `pages/3_👤_Perfil.py` (via `st.query_params`) já estão
-  prontos para esse fluxo — nenhuma mudança adicional necessária do lado do
-  front.
+**Superado**: a abordagem original de magic link (e-mail com link clicável,
+tratado via `st.query_params` em `pages/3_👤_Perfil.py`) foi substituída por
+um fluxo de código de verificação de 6 dígitos digitado dentro do app, para
+evitar o redirecionamento entre e-mail e app. Ver
+`apis/authentication/3600536_reset_request_reset_link_GET.xs` (envia o
+código por e-mail via `generate_reset_code`) e
+`apis/authentication/3600537_reset_magic_link_login_POST.xs` (endpoint
+`reset/verify-code`, troca o código por um auth token).
 
 ## Segurança: endpoint público `edutrackAPI` (academic_task GET)
 
