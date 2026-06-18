@@ -1,24 +1,24 @@
-// Exchanges magic token for auth token. Logs in user with the one-time link.
-query "reset/magic-link-login" verb=POST {
+// Verifica o código de redefinição de senha e troca por um auth token.
+query "reset/verify-code" verb=POST {
   api_group = "Authentication"
 
   input {
-    text magic_token? filters=trim
+    text code? filters=trim
     text email? filters=trim
   }
 
   stack {
-    // Check to make sure the magic token exists
-    precondition ($input.magic_token != null) {
-      error = "magic_token is required but was not provided."
+    // Check to make sure the code exists
+    precondition ($input.code != null) {
+      error = "code is required but was not provided."
     }
-  
+
     // Check to make sure the email exists
     precondition ($input.email != null) {
       error = "email is required but not provided"
     }
-  
-    // Get the user record with the email from the URL
+
+    // Get the user record with the email informado
     db.get user {
       field_name = "email"
       field_value = $input.email
@@ -34,28 +34,28 @@ query "reset/magic-link-login" verb=POST {
         "password_reset.used"
       ]
     } as $user
-  
-    // Valida se o token fornecido coincide com o salvo no banco (comparação direta de texto)
+
+    // Valida se o código fornecido coincide com o salvo no banco (comparação direta de texto)
     var $verify_token {
-      value = $input.magic_token == $user.password_reset.token
+      value = $input.code == $user.password_reset.token
     }
-  
-    // Verifica se a validação do token é verdadeira
+
+    // Verifica se a validação do código é verdadeira
     precondition ($verify_token) {
       error_type = "unauthorized"
-      error = "O token não coincide."
+      error = "O código informado está incorreto."
     }
-  
-    // Check that the password reset token has not expired
+
+    // Check that the password reset code has not expired
     precondition ($user.password_reset.expiration > now) {
-      error = "Magic token has expired. Please request another one."
+      error = "Este código expirou. Solicite um novo."
     }
-  
-    // Check to make sure the password reset has not been used
+
+    // Check to make sure the password reset code has not been used
     precondition ($user.password_reset.used == false) {
-      error = "This magic link has already been used. Please request another one."
+      error = "Este código já foi utilizado. Solicite um novo."
     }
-  
+
     // Create an authentication token
     security.create_auth_token {
       table = "user"
@@ -78,12 +78,12 @@ query "reset/magic-link-login" verb=POST {
       }
     } as $user1
   
-    // Create an event log for password reset login
+    // Create an event log for password reset code verification
     function.run "Getting Started Template/create_event_log" {
       input = {
         user_id   : $user.id
         account_id: $user.account_id
-        action    : "login_for_password_reset"
+        action    : "verify_password_reset_code"
         metadata  : $user1
       }
     } as $event_log

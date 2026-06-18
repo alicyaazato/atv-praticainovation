@@ -8,26 +8,16 @@ query "reset/request-reset-link" verb=POST {
   }
 
   stack {
-    // Gera um token único e salva no registro do usuário
-    function.run "Getting Started Template/generate_magic_link" {
+    // Gera um código de 6 dígitos e salva no registro do usuário
+    function.run "Getting Started Template/generate_reset_code" {
       input = {email: $input.email}
-    } as $token_and_email
-  
-    // Verifica se o token foi gerado com sucesso
-    precondition ($token_and_email != null) {
-      error = "Não foi possível criar o link de reset. Tente novamente."
+    } as $code_and_email
+
+    // Verifica se o código foi gerado com sucesso
+    precondition ($code_and_email != null) {
+      error = "Não foi possível gerar o código de redefinição. Tente novamente."
     }
-  
-    // URL base do aplicativo (EduTrack AI)
-    var $app_base_url {
-      value = $env.FRONTEND_URL
-    }
-  
-    // Cria o link mágico para o reset
-    var $magic_link {
-      value = ($app_base_url) ~ "/?magic_token=" ~ ($token_and_email.token) ~ "&email=" ~ ($token_and_email.email)
-    }
-  
+
     // Cria o corpo do e-mail em HTML
     util.template_engine {
       value = """
@@ -68,30 +58,31 @@ query "reset/request-reset-link" verb=POST {
               line-height: 1.6; 
               color: #3f3f46; 
             }
-            .email-highlight { 
-              display: inline-block; 
-              background: #f4f4f5; 
-              padding: 6px 12px; 
-              border-radius: 6px; 
-              font-weight: 600; 
-              color: #09090b; 
-              border: 1px solid #e4e4e7; 
+            .email-highlight {
+              display: inline-block;
+              background: #f4f4f5;
+              padding: 6px 12px;
+              border-radius: 6px;
+              font-weight: 600;
+              color: #09090b;
+              border: 1px solid #e4e4e7;
               letter-spacing: 0.5px;
             }
-            .button-container { 
-              text-align: center; 
-              margin: 30px 0; 
+            .code-container {
+              text-align: center;
+              margin: 30px 0;
             }
-            .button { 
-              background-color: #09090b; 
-              color: #ffffff; 
-              padding: 12px 24px; 
-              text-decoration: none; 
-              border-radius: 6px; 
-              font-weight: 500; 
-              display: inline-block; 
+            .code {
+              display: inline-block;
+              background-color: #09090b;
+              color: #ffffff;
+              padding: 16px 32px;
+              border-radius: 8px;
+              font-weight: 700;
+              font-size: 32px;
+              letter-spacing: 8px;
             }
-            .footer { 
+            .footer {
               font-size: 14px; 
               color: #71717a; 
               text-align: center; 
@@ -110,17 +101,16 @@ query "reset/request-reset-link" verb=POST {
               <p>Olá,</p>
               <p>Recebemos uma solicitação para redefinir a senha da conta associada ao e-mail abaixo:</p>
               <p style="text-align: center; margin: 24px 0;">
-                <span class="email-highlight">{{ $var.token_and_email.email|e('html') }}</span>
+                <span class="email-highlight">{{ $var.code_and_email.email|e('html') }}</span>
               </p>
-              <p>Se você fez esta solicitação, clique no botão abaixo para criar uma nova senha e recuperar seu acesso:</p>
-              <div class="button-container">
-                <a href="{{ $var.magic_link|e('html_attr') }}" class="button">Redefinir Minha Senha</a>
+              <p>Use o código abaixo no app EduTrack AI para confirmar a redefinição e criar uma nova senha:</p>
+              <div class="code-container">
+                <span class="code">{{ $var.code_and_email.code|e('html') }}</span>
               </div>
-              <p>Se você não solicitou a redefinição de senha, pode ignorar este e-mail com segurança. Nenhuma alteração será feita na sua conta.</p>
+              <p>Este código expira em 15 minutos. Se você não solicitou a redefinição de senha, pode ignorar este e-mail com segurança. Nenhuma alteração será feita na sua conta.</p>
             </div>
             <div class="footer">
-              <p>Problemas com o botão? Copie e cole o link abaixo no seu navegador:</p>
-              <p style="word-break: break-all; color: #52525b;">{{ $var.magic_link|e('html') }}</p>
+              <p>Por segurança, nunca compartilhe este código com outras pessoas.</p>
             </div>
           </div>
         </body>
@@ -129,22 +119,21 @@ query "reset/request-reset-link" verb=POST {
     } as $message
   
     // Envia o e-mail via Resend (plano gratuito: 3.000/mês, 100/dia).
-    // Variáveis de ambiente necessárias no Xano:
+    // Variável de ambiente necessária no Xano:
     //   RESEND_API_KEY → chave gerada em resend.com/api-keys
-    //   FRONTEND_URL   → https://atv-praticainovation-kdmdubdbe3nrdurbbasjiu.streamlit.app
     util.send_email {
-      service_provider = "resend"
       api_key = $env.RESEND_API_KEY
-      subject = "Recuperação de senha — EduTrack AI"
+      service_provider = "resend"
+      subject = "Seu código de redefinição de senha — EduTrack AI"
       message = $message
-      to = $token_and_email.email
+      to = $code_and_email.email
       from = "onboarding@resend.dev"
     } as $send_email
   }
 
   response = {
     success: true
-    message: "E-mail de recuperação enviado com sucesso."
+    message: "Código de redefinição enviado com sucesso."
   }
 
   tags = ["xano:quick-start"]
