@@ -7,25 +7,100 @@ from utils.api_client import (
     get_profile,
     is_authenticated,
     login,
-    magic_link_login,
     request_password_reset,
     set_token,
     signup,
+    verify_reset_code,
 )
 from utils.ui import inject_global_styles
 
-# ── Login via magic link (redefinição de senha) ────────────────────────────────
 
-qp = st.query_params
-if not is_authenticated() and "magic_token" in qp and "email" in qp:
-    token, err = magic_link_login(qp["magic_token"], qp["email"])
-    if err:
-        st.error(f"Link de redefinição inválido ou expirado: {err}")
-    else:
-        set_token(token)
-        st.session_state["force_password_tab"] = True
-        st.query_params.clear()
-        st.switch_page("pages/3_👤_Perfil.py")
+def render_password_reset_flow(key_prefix: str, known_email: str | None = None):
+    """Fluxo de redefinição de senha em 2 passos: solicitar código por e-mail
+    e depois confirmar o código junto com a nova senha."""
+    step_key = f"{key_prefix}_reset_step"
+    email_key = f"{key_prefix}_reset_email"
+    step = st.session_state.get(step_key, "request")
+
+    if step == "request":
+        with st.form(f"form_{key_prefix}_reset_request"):
+            email_input = st.text_input(
+                "E-mail cadastrado",
+                value=known_email or "",
+                disabled=bool(known_email),
+                placeholder="seu@email.com",
+                key=f"{key_prefix}_reset_email_input",
+            )
+            enviar = st.form_submit_button(
+                "📧 Enviar código", type="primary", use_container_width=True
+            )
+
+        if enviar:
+            alvo = (known_email or email_input).strip()
+            if not alvo:
+                st.warning("Informe seu e-mail.")
+            else:
+                _, err = request_password_reset(alvo)
+                if err:
+                    st.error(err)
+                else:
+                    st.session_state[email_key] = alvo
+                    st.session_state[step_key] = "verify"
+                    st.rerun()
+        return
+
+    email_alvo = st.session_state.get(email_key, known_email or "")
+    st.success(f"Código enviado para **{email_alvo}**. Verifique sua caixa de entrada.")
+
+    with st.form(f"form_{key_prefix}_reset_verify"):
+        codigo = st.text_input(
+            "Código recebido", max_chars=6, placeholder="000000", key=f"{key_prefix}_codigo"
+        )
+        nova_senha = st.text_input(
+            "Nova senha", type="password", placeholder="Mínimo 8 caracteres",
+            key=f"{key_prefix}_nova_senha",
+        )
+        conf_senha = st.text_input(
+            "Confirmar nova senha", type="password", placeholder="••••••••",
+            key=f"{key_prefix}_conf_senha",
+        )
+        col_confirmar, col_reenviar = st.columns(2)
+        with col_confirmar:
+            confirmar = st.form_submit_button(
+                "🔒 Confirmar e trocar senha", type="primary", use_container_width=True
+            )
+        with col_reenviar:
+            reenviar = st.form_submit_button(
+                "↩️ Trocar e-mail / reenviar", use_container_width=True
+            )
+
+    if reenviar:
+        st.session_state.pop(step_key, None)
+        st.session_state.pop(email_key, None)
+        st.rerun()
+
+    if confirmar:
+        if not codigo or not nova_senha or not conf_senha:
+            st.warning("Preencha todos os campos.")
+        elif len(nova_senha) < 8:
+            st.error("A senha deve ter no mínimo 8 caracteres.")
+        elif nova_senha != conf_senha:
+            st.error("As senhas não coincidem.")
+        else:
+            token, err = verify_reset_code(email_alvo, codigo.strip())
+            if err:
+                st.error(err)
+            else:
+                set_token(token)
+                _, err2 = change_password(nova_senha, conf_senha)
+                if err2:
+                    st.error(err2)
+                else:
+                    st.session_state.pop(step_key, None)
+                    st.session_state.pop(email_key, None)
+                    st.success("Senha alterada com sucesso!")
+                    st.rerun()
+
 
 # ── Autenticado ───────────────────────────────────────────────────────────────
 
@@ -61,38 +136,6 @@ if is_authenticated():
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Fluxo de magic link: definir nova senha imediatamente ─────────────────
-    if st.session_state.pop("force_password_tab", False):
-        st.info("Você acessou pelo link de redefinição de senha. Defina sua nova senha abaixo.")
-        st.markdown("#### 🔒 Definir nova senha")
-
-        with st.form("form_alterar_senha_magic"):
-            nova_senha_m = st.text_input(
-                "Nova senha", type="password",
-                placeholder="Mínimo 8 caracteres", key="nova_senha_magic",
-            )
-            conf_senha_m = st.text_input(
-                "Confirmar nova senha", type="password",
-                placeholder="••••••••", key="conf_senha_magic",
-            )
-            alterar_m = st.form_submit_button("🔒 Alterar senha", use_container_width=True, type="primary")
-
-        if alterar_m:
-            if not nova_senha_m or not conf_senha_m:
-                st.warning("Preencha os dois campos de senha.")
-            elif len(nova_senha_m) < 8:
-                st.error("A senha deve ter no mínimo 8 caracteres.")
-            elif nova_senha_m != conf_senha_m:
-                st.error("As senhas não coincidem.")
-            else:
-                _, err = change_password(nova_senha_m, conf_senha_m)
-                if err:
-                    st.error(err)
-                else:
-                    st.success("Senha alterada com sucesso!")
-
-        st.divider()
-
     # ── Tabs: editar perfil / segurança ───────────────────────────────────────
     tab_perfil, tab_seguranca = st.tabs(["✏️ Editar Perfil", "🔒 Segurança"])
 
@@ -118,17 +161,10 @@ if is_authenticated():
     with tab_seguranca:
         st.markdown("#### Redefinição de senha")
         st.info(
-            "Por segurança, a senha é redefinida exclusivamente via e-mail. "
-            "Clique no botão abaixo para receber o link de redefinição no seu e-mail cadastrado."
+            "Por segurança, a senha é redefinida com um código enviado para o "
+            "seu e-mail cadastrado. Informe o código recebido para confirmar a troca."
         )
-        st.write(f"**E-mail cadastrado:** {dados.get('email', '—')}")
-
-        if st.button("📧 Enviar link de redefinição", type="primary"):
-            _, err = request_password_reset(dados.get("email", ""))
-            if err:
-                st.error(f"Erro ao enviar: {err}")
-            else:
-                st.success("Link de redefinição enviado! Verifique sua caixa de entrada.")
+        render_password_reset_flow("seg", known_email=dados.get("email"))
 
     # ── Sair ──────────────────────────────────────────────────────────────────
     st.divider()
@@ -182,19 +218,7 @@ else:
                         st.rerun()
 
             with st.expander("Esqueci minha senha"):
-                with st.form("form_esqueci_senha"):
-                    email_reset = st.text_input("E-mail cadastrado", placeholder="seu@email.com", key="email_reset")
-                    enviar_reset = st.form_submit_button("Enviar link de redefinição", use_container_width=True)
-
-                if enviar_reset:
-                    if not email_reset:
-                        st.warning("Informe seu e-mail.")
-                    else:
-                        _, err = request_password_reset(email_reset.strip())
-                        if err:
-                            st.error(err)
-                        else:
-                            st.success("Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.")
+                render_password_reset_flow("esq")
 
         with tab_registro:
             st.markdown("#### Crie sua conta gratuita")

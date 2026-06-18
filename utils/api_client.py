@@ -297,13 +297,13 @@ def request_password_reset(email: str):
     return request("POST", f"{AUTH_URL}/reset/request-reset-link", auth=False, json={"email": email})
 
 
-def magic_link_login(magic_token: str, email: str):
-    """Troca o magic token (vindo do link do e-mail) por um auth token."""
+def verify_reset_code(email: str, code: str):
+    """Confirma o código de redefinição recebido por e-mail e troca por um auth token."""
     data, err = request(
         "POST",
-        f"{AUTH_URL}/reset/magic-link-login",
+        f"{AUTH_URL}/reset/verify-code",
         auth=False,
-        json={"magic_token": magic_token, "email": email},
+        json={"email": email, "code": code},
     )
     if err:
         return None, err
